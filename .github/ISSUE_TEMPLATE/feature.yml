@@ -1,0 +1,16 @@
+name: Feature or translation service
+description: Suggest a feature or a new translation provider
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: What should OmaTranslate do, and in what situation would you use it?
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Service (if a provider)
+      description: Name, API docs link, whether it needs a key, free limits.

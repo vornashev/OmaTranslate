@@ -1,0 +1,27 @@
+name: Language support
+description: A language is missing, detected wrongly, or its interface translation needs work
+labels: [languages]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is it about
+      options:
+        - Translation language missing
+        - Wrong language detection
+        - Text on images (OCR)
+        - Interface translation
+    validations:
+      required: true
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: e.g. Ukrainian (uk)
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Example text, what you expected, or the strings that read wrong.

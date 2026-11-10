@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Check UI catalogs against en.json: placeholders must match; keys used in
+QML must exist in English. Missing keys in other languages are reported
+(they fall back to English at runtime) but only fail with --strict."""
+import json
+import pathlib
+import re
+import sys
+
+root = pathlib.Path(__file__).resolve().parent.parent / "plugin"
+strict = "--strict" in sys.argv
+english = json.loads((root / "i18n/en.json").read_text())
+placeholders = lambda value: sorted(re.findall(r"%\d", json.dumps(value)))
+errors = []
+used = set()
+for qml in root.glob("*.qml"):
+    used |= set(re.findall(r'\bt\("([A-Za-z0-9_]+)"\)', qml.read_text()))
+for key in sorted(used - set(english)):
+    errors.append(f"en.json: missing key used in QML: {key}")
+for path in sorted((root / "i18n").glob("*.json")):
+    if path.name == "en.json":
+        continue
+    catalog = json.loads(path.read_text())
+    for key in sorted(set(catalog) - set(english)):
+        errors.append(f"{path.name}: unknown key {key}")
+    for key, value in catalog.items():
+        if key in english and placeholders(value) != placeholders(english[key]):
+            errors.append(f"{path.name}: placeholders differ for {key}")
+    missing = sorted(set(english) - set(catalog))
+    if missing:
+        (errors.append if strict else print)(f"{path.name}: {len(missing)} untranslated: {', '.join(missing[:8])}")
+for error in errors:
+    print(error, file=sys.stderr)
+sys.exit(1 if errors else 0)

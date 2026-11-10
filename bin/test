@@ -1,0 +1,11 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+cargo test --locked "$@"
+cargo build --locked "$@"
+python3 bin/i18n-check
+python3 tests/ui_smoke.py
+python3 tests/visual_regression.py
+python3 tests/integration.py
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+python3 bin/package_app.py --validate

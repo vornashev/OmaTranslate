@@ -1,0 +1,56 @@
+# Maintainer: vornashev
+# AUR recipe: builds a tagged GitHub release. Kept in sync with ../PKGBUILD,
+# which builds the local checkout for ./install.sh.
+pkgname=omatranslate
+pkgver=0.2.0
+pkgrel=1
+pkgdesc='Fast text and screenshot translation for Omarchy'
+arch=('x86_64' 'aarch64')
+url='https://github.com/vornashev/OmaTranslate'
+license=('MIT')
+# GCC LTO bytecode in aws-lc cannot be linked by Rust's lld. Cargo retains its own thin LTO.
+options=('!lto' '!debug')
+depends=('cairo' 'python' 'tesseract' 'tesseract-data-eng' 'wl-clipboard' 'wtype' 'grim' 'slurp' 'quickshell' 'xdg-desktop-portal')
+makedepends=('rust' 'pkgconf' 'cmake')
+optdepends=('python-pip: install the optional offline translation runtime'
+            'tesseract-data-rus: recognize Russian text on images (any tesseract-data-* adds its language)')
+install=omatranslate.install
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "OmaTranslate-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "OmaTranslate-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release --features packaged
+}
+
+check() {
+  cd "OmaTranslate-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen
+}
+
+package() {
+  cd "OmaTranslate-$pkgver"
+  install -Dm755 target/release/omatranslate "$pkgdir/usr/bin/omatranslate"
+  install -Dm755 bin/integrate.py "$pkgdir/usr/bin/omatranslate-integrate"
+  install -Dm755 bin/setup-offline "$pkgdir/usr/bin/omatranslate-setup-offline"
+  install -Dm755 bin/integrate.py "$pkgdir/usr/share/omatranslate/integrate.py"
+  install -Dm644 worker/offline.py "$pkgdir/usr/share/omatranslate/offline.py"
+  install -Dm644 worker/requirements.txt "$pkgdir/usr/share/omatranslate/requirements.txt"
+  if [[ -f models.lock.json ]]; then
+    install -Dm644 models.lock.json "$pkgdir/usr/share/omatranslate/models.lock.json"
+  fi
+  install -Dm644 manifest.json "$pkgdir/usr/share/omatranslate/plugin/manifest.json"
+  cp -r plugin "$pkgdir/usr/share/omatranslate/plugin/plugin"
+  install -Dm644 pkgbuild/omatranslate.desktop "$pkgdir/usr/share/applications/omatranslate.desktop"
+  install -Dm644 pkgbuild/omatranslate.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/omatranslate.svg"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/omatranslate/LICENSE"
+}

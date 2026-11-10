@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "vornashev.omatranslate",
+  "name": "OmaTranslate",
+  "description": "Translate selections, clipboard images and screen regions",
+  "version": "0.2.0",
+  "author": "vornashev",
+  "license": "MIT",
+  "kinds": ["overlay", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "plugin/Translate.qml",
+    "barWidget": "plugin/TranslateBar.qml"
+  },
+  "barWidget": {
+    "displayName": "OmaTranslate",
+    "description": "Open the translator; right-click for settings",
+    "category": "Utilities",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

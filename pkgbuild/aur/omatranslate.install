@@ -1,0 +1,21 @@
+post_install() {
+  cat <<'MSG'
+==> OmaTranslate is installed. To add the bar button and shortcuts, run as your user (not root):
+      omatranslate-integrate
+    Text recognition for other languages: sudo pacman -S tesseract-data-<code>
+MSG
+}
+
+post_upgrade() {
+  cat <<'MSG'
+==> OmaTranslate was updated. Refresh the plugin and restart the backend as your user:
+      omatranslate-integrate
+MSG
+}
+
+pre_remove() {
+  cat <<'MSG'
+==> To remove the bar button and shortcuts, run as your user before or after removal:
+      omatranslate-integrate --remove
+MSG
+}

@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install build tools
+        run: pacman -Syu --noconfirm --needed git base-devel rust pkgconf cmake cairo pacman-contrib github-cli
+      - uses: actions/checkout@v4
+      - name: Check versions match the tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          grep -q "^version = \"$version\"" Cargo.toml
+          grep -q "\"version\": \"$version\"" manifest.json
+          grep -q "^pkgver=$version$" pkgbuild/aur/PKGBUILD
+      - name: Build the AUR recipe against the tag archive
+        run: |
+          useradd -m builder
+          cp pkgbuild/aur/PKGBUILD pkgbuild/aur/omatranslate.install /home/builder/
+          chown -R builder /home/builder
+          cd /home/builder
+          # Build tools are installed above; runtime dependencies aren't needed to build.
+          su builder -c 'updpkgsums && makepkg --nodeps --cleanbuild --noconfirm && makepkg --printsrcinfo > .SRCINFO'
+          sha256sum *.pkg.tar.zst > SHA256SUMS
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          notes=$(awk -v v="${GITHUB_REF_NAME#v}" '$0 ~ "^## \\[?"v {f=1; next} /^## / {f=0} f' CHANGELOG.md)
+          gh release create "$GITHUB_REF_NAME" --title "OmaTranslate $GITHUB_REF_NAME" --notes "${notes:-See CHANGELOG.md}" \
+            /home/builder/*.pkg.tar.zst /home/builder/SHA256SUMS /home/builder/PKGBUILD /home/builder/.SRCINFO /home/builder/omatranslate.install

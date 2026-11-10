@@ -1,0 +1,13 @@
+#!/bin/bash
+set -euo pipefail
+task_data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/omatranslate"
+task_source_dir="$(cd "$(dirname "$0")/.." && pwd)"
+task_requirements="$task_source_dir/worker/requirements.txt"
+if [[ ! -f "$task_requirements" ]]; then
+  task_requirements=/usr/share/omatranslate/requirements.txt
+fi
+mkdir -p "$task_data_dir"
+python3 -m venv "$task_data_dir/venv"
+"$task_data_dir/venv/bin/python" -m pip install -r "$task_requirements"
+"$task_data_dir/venv/bin/python" -c 'import ctranslate2, sentencepiece; print("Offline engine ready")'
+printf '%s\n' 'Open OmaTranslate settings to download the language models.'

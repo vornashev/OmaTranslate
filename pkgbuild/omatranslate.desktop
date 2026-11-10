@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Name=OmaTranslate
+Name[ru]=OmaTranslate
+Comment=Translate text and screenshots
+Comment[ru]=Перевод текста и скриншотов
+Exec=omatranslate open
+Icon=omatranslate
+Terminal=false
+Categories=Utility;
+Keywords=translate;translation;OCR;
+Actions=Settings;Screenshot;
+
+[Desktop Action Settings]
+Name=Settings
+Name[ru]=Настройки
+Exec=omatranslate settings
+
+[Desktop Action Screenshot]
+Name=Translate screen region
+Name[ru]=Перевести область экрана
+Exec=omatranslate screenshot

@@ -1,0 +1,31 @@
+[package]
+name = "omatranslate"
+version = "0.2.0"
+edition = "2024"
+license = "MIT"
+description = "Keyboard-first native translation for Omarchy"
+
+[features]
+# Installed builds resolve assets from /usr/share instead of the build checkout.
+packaged = []
+
+[dependencies]
+anyhow = "1.0"
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net", "io-util", "io-std", "process", "sync", "time", "fs", "signal"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "stream"] }
+futures-util = "0.3"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+cairo-rs = { version = "0.18", default-features = false }
+sha2 = "0.10"
+zip = { version = "2.6", default-features = false, features = ["deflate"] }
+tempfile = "3.27"
+libc = "0.2"
+zbus = { version = "5.19", default-features = false, features = ["tokio"] }
+whatlang = "0.18.0"
+
+[profile.release]
+lto = "thin"
+strip = true

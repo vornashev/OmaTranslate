@@ -1,0 +1,4 @@
+# Keep release archives (AUR source) lean: design sources aren't needed to build.
+OmaTranslate.figcraft export-ignore
+design/ export-ignore
+*.png binary
