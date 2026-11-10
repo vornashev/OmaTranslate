@@ -323,6 +323,7 @@ class InstallerDiagnosticsTests(unittest.TestCase):
                 installer.config_errors()
 
 
+@unittest.skipUnless(shutil.which("omarchy"), "needs the real omarchy plugin validator (not on CI)")
 class InstallerPayloadTests(unittest.TestCase):
     def test_makepkg_symlinks_are_not_part_of_runtime_validation(self):
         with tempfile.TemporaryDirectory() as temporary:
