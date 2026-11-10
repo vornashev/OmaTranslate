@@ -30,7 +30,7 @@ For a downloaded or cloned repository, the single entry point is:
 
 The script resolves dependencies, uses a verified current local package or builds one, installs it with pacman, and enables the plugin. It requests privilege only for native packages; plugin integration runs as the user. A caller without a terminal is handed off to an Omarchy terminal for the password prompt. There is no unauthenticated download-and-execute bootstrap or invented release URL.
 
-Integration persists the plugin files and bar entry before asking the shell to rescan. It tolerates transient IPC failures and attempts one stock shell restart if needed. An activation timeout retains the saved integration and returns a failure with `activation-pending` diagnostics. `./install.sh --repair` retries integration using the already installed backend, without a package build, sudo, or terminal handoff. This is not a backend update.
+Integration persists the plugin files and bar entry before asking the shell to rescan. It tolerates transient IPC failures and attempts one stock shell restart if needed. An activation timeout retains the saved integration and returns a failure with `activation-pending` diagnostics. `./install.sh --plugin` (alias `--repair`) retries integration using the already installed backend, without a package build, sudo, or terminal handoff. This is not a backend update.
 
 The installed Omarchy plugin manager clones and updates repositories; it does not run arbitrary installation hooks or compile this Rust backend. After `omarchy plugin add <public-repository-url>` without `--enable`, run:
 

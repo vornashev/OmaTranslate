@@ -28,7 +28,7 @@ Conflicting shortcuts are never overwritten. Backups go to `~/.local/state/omatr
 ```bash
 ./install.sh --offline-engine   # also install the offline translation engine
 ./install.sh --rebuild          # force a package rebuild
-./install.sh --repair           # restore only the integration, no build, no sudo
+./install.sh --plugin           # update only the plugin QML, bar button and shortcuts: no build, no sudo
 ./install.sh --uninstall        # remove the app and the integration
 ```
 
@@ -51,10 +51,10 @@ If writing files or checking shortcuts fails, the integration changes are rolled
 If the package is installed but the button is missing, restore only the integration, without building and without `sudo`:
 
 ```bash
-./install.sh --repair
+./install.sh --plugin
 ```
 
-`--repair` uses the installed backend; to update the app itself, run `./install.sh`.
+`--plugin` (formerly `--repair`, which still works) copies the QML from your checkout and keeps the installed backend; the shell restarts only if the interface changed. If a change also touches the Rust backend, run `./install.sh`.
 
 ### Diagnostics
 
@@ -62,7 +62,7 @@ If the package is installed but the button is missing, restore only the integrat
 - `~/.local/state/omatranslate/last-integration.json`: integration errors and Hyprland check results.
 - `omatranslate doctor`: tools, OCR languages, offline engine and models.
 
-Success is confirmed by `OmaTranslate installation completed successfully`, `OmaTranslate is installed` or `OmaTranslate integration repaired`. A message that a terminal was opened doesn't mean the install itself succeeded.
+Success is confirmed by `OmaTranslate installation completed successfully`, `OmaTranslate is installed` or `OmaTranslate plugin updated`. A message that a terminal was opened doesn't mean the install itself succeeded.
 
 ## Omarchy Marketplace
 

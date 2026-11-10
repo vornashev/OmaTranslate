@@ -19,7 +19,7 @@ python3 bin/integrate.py        # install the QML from this checkout and enable 
 omatranslate doctor             # tools, OCR languages, models
 ```
 
-After changing QML, run `python3 bin/integrate.py` again. If the interface changed, the shell restarts so it loads the new QML.
+After changing QML, run `./install.sh --plugin`: it copies `plugin/` into Omarchy without rebuilding the backend or asking for `sudo`, and restarts the shell only if the interface changed. After changing Rust code, run `./install.sh`.
 
 ## Tests
 

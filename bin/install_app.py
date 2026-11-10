@@ -127,9 +127,9 @@ def integrate(*arguments):
 
 def execute(args):
     if args.repair:
-        print("Repairing the plugin, bar entry and shortcuts using the installed backend…", flush=True)
+        print("Updating the plugin, bar button and shortcuts; the installed backend is kept…", flush=True)
         integrate()
-        print("OmaTranslate integration repaired. Click A↔Я in the bar or run omatranslate open.")
+        print("OmaTranslate plugin updated. Click 文A in the bar or run omatranslate open.")
         return
     if args.uninstall:
         print("Removing OmaTranslate integration and native package. Settings and models are kept.", flush=True)
@@ -158,7 +158,7 @@ def execute(args):
     if args.offline_engine:
         run(["bash", ROOT / "bin/setup-offline"])
     integrate()
-    print("OmaTranslate is installed. Click A↔Я in the bar or run omatranslate open.")
+    print("OmaTranslate is installed. Click 文A in the bar or run omatranslate open.")
 
 
 def main(argv=None, run_id=None):
@@ -167,12 +167,14 @@ def main(argv=None, run_id=None):
     parser.add_argument("--rebuild", action="store_true", help="rebuild even when a current package is available")
     parser.add_argument("--offline-engine", action="store_true", help="also install the optional CTranslate2 runtime")
     parser.add_argument("--uninstall", action="store_true", help="remove the package and integration; retain settings/models")
-    parser.add_argument("--repair", action="store_true", help="repair the plugin/bar/shortcuts with the installed backend; no build or sudo")
+    parser.add_argument("--plugin", "--repair", dest="repair", action="store_true",
+                        help="update only the plugin QML, bar button and shortcuts from this checkout, "
+                             "using the installed backend; no build or sudo")
     args = parser.parse_args(arguments)
     if args.uninstall and (args.rebuild or args.offline_engine):
         parser.error("--uninstall cannot be combined with installation options")
     if args.repair and (args.uninstall or args.rebuild or args.offline_engine):
-        parser.error("--repair cannot be combined with package installation/removal options")
+        parser.error("--plugin cannot be combined with package installation/removal options")
     if os.geteuid() == 0:
         raise RuntimeError("Run ./install.sh as your normal user, without sudo. It requests privileges only for packages.")
     commands = ("omarchy", "omarchy-shell", "hyprctl", "omatranslate") if args.repair else ("pacman", "makepkg", "omarchy", "omarchy-shell", "hyprctl")
@@ -197,7 +199,7 @@ if __name__ == "__main__":
     except (RuntimeError, OSError, subprocess.CalledProcessError) as error:
         message = str(error)
         print(f"OmaTranslate installation stopped: {message}", file=sys.stderr)
-        print("Diagnostics were saved. Use ./install.sh --repair if the package is already installed, or rerun ./install.sh.", file=sys.stderr)
+        print("Diagnostics were saved. Use ./install.sh --plugin if the package is already installed, or rerun ./install.sh.", file=sys.stderr)
         status = 1
     except KeyboardInterrupt:
         print("\nInstallation cancelled.", file=sys.stderr)
