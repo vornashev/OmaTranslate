@@ -5,3 +5,7 @@ __pycache__/
 *.pkg.tar.*
 /pkg/
 /target/
+
+# Local design sources (FigCraft mockup and its generator)
+/design/
+/OmaTranslate.figcraft

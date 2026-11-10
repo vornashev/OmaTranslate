@@ -1,7 +1,7 @@
 """Render the real plugin QML in every designed state, in a dark and a light theme.
 
 Shared by tests/visual_regression.py (compares with tests/visual/*.png) and
-design/preview_states.py (writes the pictures for review).
+tests/preview_states.py (writes the pictures for review).
 """
 import json
 import os

@@ -27,7 +27,7 @@ jobs:
             ~/.cargo/git
             target
           key: cargo-${{ hashFiles('Cargo.lock') }}
-      - name: Rust tests
+      - name: Rust tests (unit and end-to-end: real daemon, Tesseract, renderer)
         run: cargo test --locked
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
@@ -39,8 +39,6 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
       - name: QML smoke test
         run: python3 tests/ui_smoke.py
-      - name: End-to-end (real backend, Tesseract, renderer)
-        run: python3 tests/integration.py
       - name: Visual regression
         # Baselines come from an Omarchy desktop; font hinting can differ on CI.
         continue-on-error: true

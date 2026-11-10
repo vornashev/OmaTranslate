@@ -25,14 +25,16 @@ After changing QML, run `python3 bin/integrate.py` again. If the interface chang
 
 ```bash
 bin/test --offline                                        # everything below plus plugin validation
+cargo test --locked --offline                             # unit tests and the end-to-end daemon tests
 cargo clippy --locked --offline --all-targets -- -D warnings
 python3 bin/i18n-check                                    # interface catalogs
 python3 tests/visual_regression.py                        # screenshots vs tests/visual/
+python3 tests/preview_states.py /tmp/states               # every panel state as pictures, for review
 ```
 
 The visual regression renders every panel state in dark and light themes. After an intended interface change, update the baselines with `python3 tests/visual_regression.py --update` and look at the new pictures before committing them.
 
-End-to-end tests use the real Rust backend, Tesseract and the PNG renderer with a fake translation process. Real APIs, model downloads and live shortcuts need a manual check in a Wayland session.
+End-to-end tests (`tests/daemon.rs`) start the real daemon over its socket and use Tesseract and the PNG renderer, with a fake translation worker. Real APIs, model downloads and live shortcuts need a manual check in a Wayland session.
 
 ## Translating the interface
 
