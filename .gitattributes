@@ -2,3 +2,8 @@
 OmaTranslate.figcraft export-ignore
 design/ export-ignore
 *.png binary
+
+# Language stats on GitHub: count the app (Rust, QML, installer), not the
+# design-file generator or the test harness.
+design/** linguist-detectable=false
+tests/** linguist-detectable=false
