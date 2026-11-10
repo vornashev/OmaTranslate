@@ -25,6 +25,10 @@ Pane {
     // The job whose image the user closed. Image mode stays off for it even if the
     // backend still reports mode "image" (older backends kept it after dismiss).
     property int closedImageJob: -1
+    // Text that fits keeps the base size; up to twice the box steps down once, more than that twice.
+    function fitSize(height, box, sizes) {
+        return height <= box ? sizes[0] : height <= box * 2 ? sizes[1] : sizes[2]
+    }
     readonly property bool imageMode: stateData.mode === "image" && (stateData.job || 0) !== closedImageJob
     readonly property bool busy: ["working","capturing","ocr","translating"].indexOf(stateData.status) >= 0
     readonly property var providers: ["google","mymemory","libre","local"]
@@ -276,6 +280,12 @@ Pane {
                     id: sourceColumn
                     anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 14; rightMargin: 8; topMargin: 10 }
                     spacing: 4
+                    // Measured at the base size, so the chosen size never feeds back into the measurement.
+                    Text {
+                        id: sourceMeasure
+                        visible: false; width: sourceColumn.width - 6; text: source.text
+                        font.pixelSize: 15; font.family: root.fontFamily; wrapMode: Text.Wrap; textFormat: Text.PlainText
+                    }
                     ScrollView {
                         Layout.fillWidth: true
                         Layout.rightMargin: 6
@@ -285,7 +295,7 @@ Pane {
                             id: source; objectName: "sourceInput"
                             placeholderText: root.t("inputPlaceholder"); placeholderTextColor: ui.faint
                             color: ui.text; selectionColor: ui.accent; selectedTextColor: ui.onAccent
-                            font.pixelSize: 15; font.family: root.fontFamily; wrapMode: TextEdit.Wrap; textFormat: TextEdit.PlainText
+                            font.pixelSize: root.fitSize(sourceMeasure.contentHeight, 150 - 8, [15, 14, 13]); font.family: root.fontFamily; wrapMode: TextEdit.Wrap; textFormat: TextEdit.PlainText
                             background: null; padding: 0; topPadding: 2; selectByMouse: true
                             onTextChanged: if (!root.syncing && activeFocus && root.settings.autoTranslate) debounce.restart()
                         }
@@ -501,6 +511,11 @@ Pane {
                     id: resultColumn
                     anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10; leftMargin: 14; topMargin: 12 }
                     spacing: 8
+                    Text {
+                        id: resultMeasure
+                        visible: false; width: resultColumn.width; text: result.text
+                        font.pixelSize: 18; font.family: root.fontFamily; wrapMode: Text.Wrap; textFormat: Text.PlainText
+                    }
                     ScrollView {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.max(30, Math.min(220, result.contentHeight + 4))
@@ -510,7 +525,7 @@ Pane {
                             text: root.stateData.translated || ""
                             placeholderText: root.t("resultPlaceholder"); placeholderTextColor: ui.faint
                             color: ui.text; selectionColor: ui.accent; selectedTextColor: ui.onAccent
-                            font.pixelSize: 18; font.family: root.fontFamily; wrapMode: TextEdit.Wrap; textFormat: TextEdit.PlainText
+                            font.pixelSize: root.fitSize(resultMeasure.contentHeight, 220 - 4, [18, 16, 14]); font.family: root.fontFamily; wrapMode: TextEdit.Wrap; textFormat: TextEdit.PlainText
                             readOnly: true; selectByMouse: true; background: null; padding: 0
                         }
                     }

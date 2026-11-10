@@ -49,7 +49,7 @@ cd OmaTranslate
 
 Run the script as your user, not with `sudo`: the password is asked only for system packages (Rust and build tools only if they're missing, plus Tesseract, wl-clipboard, grim, slurp and wtype). The first build takes a few minutes. Existing shortcuts are never overwritten.
 
-A translate button (文A) appears on the right of the bar: left click opens the translator, right click opens settings, middle click translates the clipboard.
+A translate button (文A) appears on the right of the bar (see [The bar button](#the-bar-button)).
 
 | | Marketplace | Source |
 |---|---|---|
@@ -59,6 +59,18 @@ A translate button (文A) appears on the right of the bar: left click opens the 
 Removing takes away the plugin, the bar button, the shortcuts and the package; settings, history and models are kept. More options and troubleshooting: [docs/installation.md](docs/installation.md).
 
 ![A settings screen translated from English into German, right on the image](preview.png)
+
+## The bar button
+
+The 文A button on the right of the bar does three different things depending on the mouse button:
+
+| Click | What happens |
+|---|---|
+| 🖱️ Left | Opens the translator panel |
+| 🖱️ Right | Opens the panel straight on Settings |
+| 🖱️ Middle (wheel) | Translates the clipboard at once: text goes to the panel, an image is recognized and translated right on the image |
+
+The middle click is the fastest way to translate something you've copied, without touching the keyboard. Move the button like any other bar widget; reinstalling keeps its position.
 
 ## Shortcuts
 
