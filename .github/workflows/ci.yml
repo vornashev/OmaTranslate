@@ -17,7 +17,7 @@ jobs:
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm --needed git base-devel rust pkgconf cmake cairo \
-            python python-pyside6 tesseract tesseract-data-eng tesseract-data-rus \
+            python pyside6 tesseract tesseract-data-eng tesseract-data-rus \
             ttf-jetbrains-mono-nerd noto-fonts noto-fonts-cjk
       - uses: actions/checkout@v4
       - uses: actions/cache@v4

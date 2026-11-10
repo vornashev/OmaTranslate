@@ -7,7 +7,7 @@ Thanks for helping! Bug reports, interface translations, new translation service
 You need Omarchy 4 (or Arch with Quickshell) and:
 
 ```bash
-sudo pacman -S --needed rust cmake pkgconf cairo tesseract tesseract-data-eng python-pyside6
+sudo pacman -S --needed rust cmake pkgconf cairo tesseract tesseract-data-eng pyside6
 ```
 
 Build and run the backend from the checkout:
