@@ -14,7 +14,13 @@ pub async fn run(
     seconds: u64,
     cancel: &CancellationToken,
 ) -> Result<Vec<u8>> {
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    if program == "tesseract" {
+        // Image OCR runs two passes at once. Each would otherwise start an OpenMP
+        // thread per core; on two cores that is three times slower than one thread each.
+        command.env("OMP_THREAD_LIMIT", "1");
+    }
+    let mut child = command
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
