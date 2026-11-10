@@ -115,7 +115,15 @@ pub fn tesseract_code(code: &str) -> Option<&'static str> {
 /// Detects the language of `text`, or `None` when the text has no letters.
 /// `candidates` are the user's languages, most likely source first; they win
 /// for short or ambiguous text.
+#[cfg(test)]
 pub fn detect(text: &str, candidates: &[&str]) -> Option<&'static str> {
+    detect_reliably(text, candidates).map(|(code, _)| code)
+}
+
+/// Like `detect`, and whether the answer can be trusted: a script used by one
+/// language, or a confident statistical match. Short text that was settled by
+/// falling back to the user's own languages is not reliable.
+pub fn detect_reliably(text: &str, candidates: &[&str]) -> Option<(&'static str, bool)> {
     let letters = text.chars().filter(|c| c.is_alphabetic()).count();
     if letters == 0 {
         return None;
@@ -142,14 +150,14 @@ pub fn detect(text: &str, candidates: &[&str]) -> Option<&'static str> {
             Tamil => Some("ta"),
             Telugu => Some("te"),
             Hebrew => Some("he"),
-            Cyrillic => Some(cyrillic(text, candidates)),
+            Cyrillic => return Some((cyrillic(text, candidates), true)),
             // Kana mixed with kanji is Japanese; plain Han is Chinese.
             Mandarin if text.chars().any(|c| matches!(c, '\u{3040}'..='\u{30ff}')) => Some("ja"),
             Mandarin => Some("zh-CN"),
             _ => None,
         };
-        if only.is_some() {
-            return only;
+        if let Some(code) = only {
+            return Some((code, true));
         }
         // Short text in a shared script: choose among the user's languages
         // written in it (Cyrillic "Привет" is Russian for a Russian user).
@@ -162,16 +170,17 @@ pub fn detect(text: &str, candidates: &[&str]) -> Option<&'static str> {
                 .collect();
             match same.as_slice() {
                 [] => {}
-                [(code, _)] => return Some(code),
+                [(code, _)] => return Some((code, false)),
                 [(first, _), ..] => {
                     let allow = same.iter().map(|(_, lang)| *lang).collect();
-                    return Some(
+                    return Some((
                         whatlang::Detector::with_allowlist(allow)
                             .detect(text)
                             .filter(whatlang::Info::is_reliable)
                             .and_then(|info| to_code(info.lang()))
                             .unwrap_or(first),
-                    );
+                        false,
+                    ));
                 }
             }
         }
@@ -179,7 +188,7 @@ pub fn detect(text: &str, candidates: &[&str]) -> Option<&'static str> {
     let info = whatlang::detect(text)?;
     let detected = to_code(info.lang());
     if info.is_reliable() || candidates.is_empty() {
-        return detected;
+        return detected.map(|code| (code, info.is_reliable()));
     }
     // Unreliable: if one of the user's languages is close, take it.
     let allow: Vec<_> = candidates
@@ -188,12 +197,13 @@ pub fn detect(text: &str, candidates: &[&str]) -> Option<&'static str> {
         .filter_map(|l| whatlang::Lang::from_code(l.1))
         .collect();
     if allow.is_empty() {
-        return detected;
+        return detected.map(|code| (code, false));
     }
     whatlang::Detector::with_allowlist(allow)
         .detect_lang(text)
         .and_then(to_code)
         .or(detected)
+        .map(|code| (code, false))
 }
 
 /// whatlang often mistakes Russian for Bulgarian, so Cyrillic is decided by
@@ -272,5 +282,10 @@ mod tests {
         assert_eq!(detect("Привет", &["en", "uk"]), Some("uk"));
         assert_eq!(detect("Добрий день, їжак", &["en", "ru"]), Some("uk"));
         assert_eq!(detect("12345", &["ru"]), None);
+        // Only confident answers are reliable; short Latin text falls back to the user's languages.
+        assert_eq!(detect_reliably("Das Wetter ist heute sehr schön", &["en", "ru"]), Some(("de", true)));
+        assert_eq!(detect_reliably("Привет", &["en", "ru"]), Some(("ru", true)));
+        assert_eq!(detect_reliably("こんにちは", &["en"]), Some(("ja", true)));
+        assert_eq!(detect_reliably("Guten Morgen, wie geht es dir heute?", &["en", "ru"]).map(|d| d.1), Some(false));
     }
 }

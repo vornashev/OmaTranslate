@@ -181,8 +181,8 @@
   "wayReplaceHint": "选中内容就地变为译文",
   "onboardingTitle4": "无需打开此窗口也能翻译",
   "replaced": "已将选中内容替换为译文",
-  "autoSwapTitle": "%1 文本 → 自动译为 %2",
-  "autoSwapDesc": "如果原文已经是目标语言，则改为翻译成此语言。",
+  "autoSwapTitle": "%1 文本 → %2",
+  "autoSwapDesc": "已经是你的语言的文本会翻译成你最近使用的语言：最近翻译的外语文本的语言，或你手动选择的目标语言。也可以在这里固定一种语言。",
   "ocrMissingHelp": "未安装 %1 的文字识别：%2",
   "notifyNoSelection": "请先选中要替换为译文的文本。",
   "notifyNetworkError": "无法连接到翻译服务。",
@@ -192,5 +192,9 @@
   "backendMissing": "插件已添加，但翻译后端尚未安装。请在终端中运行一次以下命令，然后重新打开面板：",
   "backendMissingTitle": "完成安装",
   "copyCommand": "复制命令",
-  "barTooltip": "左键：翻译器\n右键：设置\n中键：翻译剪贴板"
+  "barTooltip": "左键：翻译器\n右键：设置\n中键：翻译剪贴板",
+  "myLanguageTitle": "我的语言",
+  "myLanguageDesc": "其他语言的文本会翻译成这种语言。",
+  "lastLanguage": "最近使用 · %1",
+  "badgeLast": "最近"
 }

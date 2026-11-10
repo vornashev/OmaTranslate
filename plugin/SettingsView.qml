@@ -166,14 +166,30 @@ Item {
                             OmaSwitch { theme: root.theme; checked: root.settings.autoTranslate === true; onToggled: root.patch({autoTranslate: checked}); anchors.verticalCenter: parent.verticalCenter }
                         }
                         OptionRow {
-                            title: root.t("autoSwapTitle").arg(root.languageName(root.settings.target)).arg(root.languageName(root.settings.secondLanguage))
-                            description: root.t("autoSwapDesc")
+                            title: root.t("myLanguageTitle"); description: root.t("myLanguageDesc")
                             LanguagePicker {
                                 theme: root.theme; translate: root.translate
                                 codes: root.languages.map(function(l) { return l.code })
                                 names: root.languages.map(function(l) { return l.name })
                                 aliases: root.languages.map(function(l) { return l.english })
-                                current: root.settings.secondLanguage || "en"
+                                current: root.settings.target || "en"
+                                onPicked: function(code) { root.patch({target: code}) }
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                        OptionRow {
+                            id: secondRow
+                            readonly property string lastName: root.t("lastLanguage").arg(root.languageName(root.settings.lastLanguage || "en"))
+                            title: root.t("autoSwapTitle").arg(root.languageName(root.settings.target))
+                                .arg(root.settings.secondLanguage === "last" ? lastName : root.languageName(root.settings.secondLanguage))
+                            description: root.t("autoSwapDesc")
+                            LanguagePicker {
+                                theme: root.theme; translate: root.translate
+                                // "last" follows the language you worked with most recently; a code pins one.
+                                codes: ["last"].concat(root.languages.map(function(l) { return l.code }))
+                                names: [secondRow.lastName].concat(root.languages.map(function(l) { return l.name }))
+                                aliases: [""].concat(root.languages.map(function(l) { return l.english }))
+                                current: root.settings.secondLanguage || "last"
                                 onPicked: function(code) { root.patch({secondLanguage: code}) }
                                 anchors.verticalCenter: parent.verticalCenter
                             }

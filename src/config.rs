@@ -12,12 +12,20 @@ use std::{
 pub struct Settings {
     pub provider: String,
     pub source: String,
+    /// The user's own language: foreign text is translated into it.
     pub target: String,
-    /// When auto-detected text is already in `target`, translate it into
-    /// `second_language` instead (formerly Russian-only `reverseRussian`).
+    /// When the text is already in `target`, translate it into the second
+    /// language instead (formerly Russian-only `reverseRussian`).
     #[serde(alias = "reverseRussian")]
     pub auto_swap: bool,
+    /// `"last"` follows `last_language`; a language code pins the second language.
     pub second_language: String,
+    /// The foreign language the user worked with most recently: the language of
+    /// incoming foreign text, or a target picked by hand.
+    pub last_language: String,
+    /// Settings format. Files written before the "last language" mode read as 0.
+    #[serde(default)]
+    pub settings_version: u32,
     pub auto_translate: bool,
     pub debounce_ms: u64,
     pub libre_url: String,
@@ -40,7 +48,9 @@ impl Default for Settings {
             source: "auto".into(),
             target: crate::languages::system().unwrap_or("en").into(),
             auto_swap: true,
-            second_language: "en".into(),
+            second_language: "last".into(),
+            last_language: "en".into(),
+            settings_version: SETTINGS_VERSION,
             auto_translate: true,
             debounce_ms: 250,
             libre_url: "http://localhost:5000".into(),
@@ -62,7 +72,7 @@ impl Settings {
         if !["google", "mymemory", "libre", "local"].contains(&self.provider.as_str()) {
             bail!("invalidProvider");
         }
-        for code in [&self.source, &self.target, &self.second_language] {
+        for code in [&self.source, &self.target, &self.second_language, &self.last_language] {
             if code.is_empty()
                 || code.len() > 12
                 || !code.bytes().all(|b| b.is_ascii_alphabetic() || b == b'-')
@@ -70,7 +80,12 @@ impl Settings {
                 bail!("invalidLanguage");
             }
         }
-        if self.target == "auto" || self.second_language == "auto" {
+        if self.target == "auto"
+            || self.second_language == "auto"
+            || ["auto", "last"].contains(&self.last_language.as_str())
+            || ["last"].contains(&self.source.as_str())
+            || self.target == "last"
+        {
             bail!("invalidLanguage");
         }
         if self.ocr_languages.len() > 100
@@ -115,9 +130,42 @@ impl Settings {
         if let Some(mut s) = loaded
             && s.validate().is_ok()
         {
+            if s.migrate() {
+                let _ = s.save();
+            }
             return s;
         }
         Self::default()
+    }
+    /// Moves older settings to the "my language + last language" mode once.
+    ///
+    /// A fixed source language meant a manual pair, often left behind by the old
+    /// swap button, which switched automatic mode off for good. The target ("translate
+    /// into") becomes the user's own language and the source the last one. Neither the
+    /// system language (many people run an English desktop) nor the swap state (the
+    /// button toggled back and forth) tells reliably which side is theirs; the target
+    /// is what they last chose to read, and "My language" is one click to change.
+    pub fn migrate(&mut self) -> bool {
+        if self.settings_version >= SETTINGS_VERSION {
+            return false;
+        }
+        if self.source != "auto" {
+            self.last_language = std::mem::replace(&mut self.source, "auto".into());
+        } else if self.second_language != "last" {
+            self.last_language = self.second_language.clone();
+        }
+        self.second_language = "last".into();
+        self.auto_swap = true;
+        self.settings_version = SETTINGS_VERSION;
+        true
+    }
+    /// The second language in effect: the pinned one, or the last one used.
+    pub fn second(&self) -> &str {
+        if self.second_language == "last" {
+            &self.last_language
+        } else {
+            &self.second_language
+        }
     }
     pub fn save(&self) -> Result<()> {
         atomic_write(
@@ -125,25 +173,82 @@ impl Settings {
             &serde_json::to_vec_pretty(self)?,
         )
     }
-    pub fn languages(&self, text: &str) -> (String, String) {
-        let source = if self.source == "auto" {
-            crate::languages::detect(text, &[&self.second_language, &self.target])
-                .unwrap_or(if self.target == self.second_language { "en" } else { &self.second_language })
-                .to_owned()
-        } else {
-            self.source.clone()
+    /// Where a text goes. `source` and `target` override the settings for one
+    /// request (a language picked in the panel, the swap button).
+    pub fn direction(&self, text: &str, source: Option<&str>, target: Option<&str>) -> Direction {
+        let second = self.second();
+        let detected = source.is_none() && self.source == "auto";
+        let (source, reliable) = match source {
+            Some(code) => (code.to_owned(), true),
+            None if detected => crate::languages::detect_reliably(text, &[second, &self.target])
+                .map(|(code, reliable)| (code.to_owned(), reliable))
+                .unwrap_or_else(|| ((if self.target == second { "en" } else { second }).to_owned(), false)),
+            None => (self.source.clone(), true),
         };
-        let target = if self.auto_swap
-            && self.source == "auto"
-            && source == self.target
-            && self.second_language != self.target
-        {
-            self.second_language.clone()
+        let (target, reason) = if let Some(code) = target {
+            (code.to_owned(), "manual")
+        } else if self.auto_swap && source == self.target && second != self.target {
+            let reason = if self.second_language == "last" { "last" } else { "second" };
+            (second.to_owned(), reason)
         } else {
-            self.target.clone()
+            (self.target.clone(), "native")
         };
-        (source, target)
+        Direction { source, target, reason, detected, reliable }
     }
+    /// Updates the last language from a finished direction. Returns whether it changed.
+    ///
+    /// A target picked by hand always counts. A detected foreign source counts
+    /// only for text long enough to be detected reliably.
+    pub fn learn(&mut self, text: &str, direction: &Direction) -> bool {
+        let next = if direction.reason == "manual" && direction.target != self.target {
+            Some(&direction.target)
+        } else if direction.detected
+            && direction.reliable
+            && direction.source != self.target
+            && reliable(text)
+        {
+            Some(&direction.source)
+        } else {
+            None
+        };
+        match next {
+            Some(code) if *code != self.last_language => {
+                self.last_language = code.clone();
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+/// The settings format written by this version.
+pub const SETTINGS_VERSION: u32 = 2;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Direction {
+    pub source: String,
+    pub target: String,
+    /// "native", "last" (own language → last language), "second" (→ pinned) or "manual".
+    pub reason: &'static str,
+    /// The source language was detected rather than given.
+    pub detected: bool,
+    /// The source is given, or detection was confident. An unreliable guess is
+    /// still used to choose the target, but services that detect better get "auto".
+    pub reliable: bool,
+}
+
+/// Enough text to trust language detection: about two words. Ideographs carry
+/// more per character than letters do.
+fn reliable(text: &str) -> bool {
+    let weight: usize = text
+        .chars()
+        .map(|c| match c as u32 {
+            0x3040..=0x30FF | 0x3400..=0x9FFF | 0xAC00..=0xD7AF => 3,
+            _ if c.is_alphabetic() => 1,
+            _ => 0,
+        })
+        .sum();
+    weight >= 10
 }
 /// English plus the session language, e.g. `eng+deu` under `de_DE.UTF-8`.
 fn default_ocr_languages() -> String {
@@ -254,16 +359,77 @@ mod tests {
         assert!(parts.iter().all(|p| p.len() <= 500));
         assert_eq!(parts.concat(), text);
     }
+    fn pair(d: Direction) -> (String, String) {
+        (d.source, d.target)
+    }
     #[test]
-    fn auto_swap_uses_second_language() {
+    fn own_language_goes_to_the_last_language() {
         let mut s = Settings { target: "ru".into(), ..Settings::default() };
-        assert_eq!(s.languages("Привет"), ("ru".into(), "en".into()));
-        assert_eq!(s.languages("Hello there").1, "ru");
+        assert_eq!(pair(s.direction("Привет", None, None)), ("ru".into(), "en".into()));
+        assert_eq!(s.direction("Привет", None, None).reason, "last");
+        assert_eq!(s.direction("Hello there", None, None).target, "ru");
         s.auto_swap = false;
-        assert_eq!(s.languages("Привет").1, "ru");
+        assert_eq!(s.direction("Привет", None, None).target, "ru");
         let s = Settings { target: "de".into(), second_language: "en".into(), ..Settings::default() };
-        assert_eq!(s.languages("Guten Morgen, wie geht es dir heute?"), ("de".into(), "en".into()));
-        assert_eq!(s.languages("Good morning, how are you today?"), ("en".into(), "de".into()));
+        let d = s.direction("Guten Morgen, wie geht es dir heute?", None, None);
+        assert_eq!((pair(d.clone()), d.reason), (("de".into(), "en".into()), "second"));
+        assert_eq!(pair(s.direction("Good morning, how are you today?", None, None)), ("en".into(), "de".into()));
+    }
+    #[test]
+    fn foreign_text_and_picked_targets_update_the_last_language() {
+        let mut s = Settings { target: "ru".into(), ..Settings::default() };
+        let text = "Das Wetter ist heute sehr schön";
+        let d = s.direction(text, None, None);
+        assert_eq!(pair(d.clone()), ("de".into(), "ru".into()));
+        assert!(s.learn(text, &d));
+        assert_eq!(s.last_language, "de");
+        // Now Russian text goes to German.
+        assert_eq!(s.direction("Доброе утро, как дела сегодня?", None, None).target, "de");
+        // A word or two doesn't move it: detection is unreliable there.
+        let d = s.direction("Hello", None, None);
+        assert!(!s.learn("Hello", &d));
+        assert_eq!(s.last_language, "de");
+        // A target picked by hand does, even for short text.
+        let d = s.direction("Привет", None, Some("es"));
+        assert_eq!((d.target.as_str(), d.reason), ("es", "manual"));
+        assert!(s.learn("Привет", &d));
+        assert_eq!(s.last_language, "es");
+        // Picking the own language by hand or translating own-language text changes nothing.
+        let d = s.direction("Hola amigos, buenos días a todos", None, Some("ru"));
+        assert!(!s.learn("Hola amigos, buenos días a todos", &d));
+        // An unreliable guess for short foreign text doesn't move it either.
+        let d = s.direction("Guten Morgen, wie geht es dir heute?", None, None);
+        assert!(!d.reliable);
+        assert!(!s.learn("Guten Morgen, wie geht es dir heute?", &d));
+        let d = s.direction("Доброе утро, как дела сегодня?", None, None);
+        assert!(!s.learn("Доброе утро, как дела сегодня?", &d));
+        assert_eq!(s.last_language, "es");
+        // The swap button: both sides given for one request.
+        let d = s.direction("Hola", Some("ru"), Some("es"));
+        assert_eq!((pair(d.clone()), d.detected), (("ru".into(), "es".into()), false));
+    }
+    #[test]
+    fn pinned_second_language_ignores_the_last_one() {
+        let s = Settings { target: "ru".into(), second_language: "en".into(), last_language: "de".into(), ..Settings::default() };
+        assert_eq!(s.direction("Доброе утро, как дела сегодня?", None, None).target, "en");
+    }
+    #[test]
+    fn manual_pairs_become_own_and_last_language_once() {
+        // The old swap button left a fixed pair behind, with automatic mode off.
+        let mut s: Settings = serde_json::from_str(
+            r#"{"source":"en","target":"ru","autoSwap":false,"secondLanguage":"ru"}"#,
+        )
+        .unwrap();
+        assert_eq!(s.settings_version, 0);
+        assert!(s.migrate());
+        assert_eq!((s.source.as_str(), s.target.as_str(), s.last_language.as_str()), ("auto", "ru", "en"));
+        assert_eq!((s.second_language.as_str(), s.auto_swap), ("last", true));
+        assert!(!s.migrate(), "migrates only once");
+        // Automatic mode with a pinned second language keeps it as the last one.
+        let mut s: Settings = serde_json::from_str(r#"{"source":"auto","target":"de","secondLanguage":"fr"}"#).unwrap();
+        s.migrate();
+        assert_eq!((s.second_language.as_str(), s.last_language.as_str()), ("last", "fr"));
+        assert!(Settings::default().settings_version == SETTINGS_VERSION);
     }
     #[test]
     fn legacy_reverse_russian_is_migrated() {

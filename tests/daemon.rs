@@ -209,3 +209,25 @@ fn validation_and_private_settings() {
         assert_eq!(mode(&socket), 0o600);
     }
 }
+
+#[test]
+fn own_language_goes_to_the_last_language() {
+    let mut d = Daemon::start();
+    d.request(json!({"op": "setSettings", "settings": {"source": "auto", "target": "ru", "secondLanguage": "last", "lastLanguage": "en", "autoSwap": true}}));
+    let done = |s: &Value, job: &Value| s["job"] == *job && (s["status"] == "ready" || s["status"] == "error");
+    // Russian text for a Russian user goes to the last language.
+    let job = d.translate("Привет")["job"].clone();
+    let state = d.wait_state(|s| done(s, &job));
+    assert_eq!((state["targetLanguage"].as_str(), state["targetReason"].as_str()), (Some("en"), Some("last")));
+    // A target picked by hand applies to this request and becomes the last language.
+    let job = d.request(json!({"op": "translate", "text": "Привет", "target": "de"}))["job"].clone();
+    let state = d.wait_state(|s| done(s, &job));
+    assert_eq!((state["targetLanguage"].as_str(), state["targetReason"].as_str()), (Some("de"), Some("manual")));
+    assert_eq!(state["settings"]["lastLanguage"], "de");
+    let saved: Value = serde_json::from_slice(&fs::read(d.path("config/omatranslate/settings.json")).unwrap()).unwrap();
+    assert_eq!(saved["lastLanguage"], "de");
+    let job = d.translate("Привет")["job"].clone();
+    assert_eq!(d.wait_state(|s| done(s, &job))["targetLanguage"], "de");
+    // Invalid overrides are rejected.
+    assert_eq!(d.request(json!({"op": "translate", "text": "x", "target": "auto"}))["error"], "invalidLanguage");
+}

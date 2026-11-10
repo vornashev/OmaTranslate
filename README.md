@@ -21,7 +21,7 @@ Instant translation of selected text, the clipboard and screenshots for [Omarchy
 - **One keystroke.** Select text in any app and press <kbd>Super</kbd>+<kbd>U</kbd>. No copy, no browser tab.
 - **Translate in place.** <kbd>Super</kbd>+<kbd>Ctrl</kbd>+<kbd>U</kbd> replaces the selection with its translation, right in the app you're typing in.
 - **Screenshots, translated on the image.** Pick a screen region. Text is recognized locally with Tesseract and the translation is drawn over the original in matching size and weight, cell by cell and paragraph by paragraph.
-- **55 languages, detected offline.** Your two languages (say German and English) are pinned. Text already in your language goes to the other one automatically.
+- **Your language, both ways.** Foreign text is translated into your language. Text already in your language goes to the language you worked with last: translate some German, and your next own-language text goes into German. 55 languages, detected offline.
 - **Names stay names.** CamelCase, product names and versions (`GPT-6`, `FrontierCode`, "Name 5.2") are not translated. Add your own terms to a do-not-translate list.
 - **Private by default.** Images never leave your machine; online services receive only the recognized text. History is off unless you turn it on. There's also a fully offline engine.
 - **Feels like Omarchy.** Theme colors and fonts, a bar button, keyboard-first, and an interface in your language.
@@ -91,7 +91,8 @@ Shortcuts can be changed in settings. Existing bindings are never overwritten.
 <img src="docs/language-picker.png" alt="Language picker with native names and search" width="360" align="right">
 
 - **Translation:** 55 languages, from Arabic to Vietnamese. On first run the target language and OCR languages follow your system locale.
-- **Detection:** offline and instant ([whatlang](https://github.com/greyblake/whatlang-rs) plus script rules). Short or ambiguous phrases resolve to one of your two languages.
+- **My language and the last language:** set your own language in Settings → General. Foreign text goes into it; text in your language goes to the last language you worked with (the last foreign text you translated, or a target you picked by hand), shown with a "last" badge. You can pin one language there instead. Picking a language or pressing ⇄ in the panel applies to the text at hand only.
+- **Detection:** offline and instant ([whatlang](https://github.com/greyblake/whatlang-rs) plus script rules). Short or ambiguous phrases resolve to your language or the last one; when the guess is unsure, Google and LibreTranslate detect the source themselves.
 - **Text on images:** any installed Tesseract language. Install more with `sudo pacman -S tesseract-data-<code>` (for example `tesseract-data-jpn`) and toggle them in Settings → Images.
 - **Interface:** English, Русский, Deutsch, Español, Français, Português, Українська, 简体中文, 日本語. It follows Omarchy's Setup → Language. [Add yours](CONTRIBUTING.md#translating-the-interface): it's one JSON file.
 

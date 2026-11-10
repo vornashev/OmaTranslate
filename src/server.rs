@@ -38,6 +38,8 @@ pub struct Snapshot {
     pub translated: String,
     pub source_language: String,
     pub target_language: String,
+    /// Why `target_language` was chosen: "native", "last", "second" or "manual".
+    pub target_reason: String,
     pub original_image: String,
     pub translated_image: String,
     pub image_width: u32,
@@ -68,6 +70,7 @@ impl Default for Snapshot {
             translated: String::new(),
             source_language: String::new(),
             target_language: String::new(),
+            target_reason: String::new(),
             original_image: String::new(),
             translated_image: String::new(),
             image_width: 0,
@@ -102,6 +105,9 @@ struct Job {
     files: Arc<tempfile::TempDir>,
     settings: Settings,
     started: Instant,
+    /// Languages given for this request only (picked in the panel, the swap button).
+    source_override: Option<String>,
+    target_override: Option<String>,
 }
 pub struct App {
     state: Mutex<State>,
@@ -167,6 +173,8 @@ impl App {
             files: s.files.as_ref().context("invalidImage")?.clone(),
             settings: s.snapshot.settings.clone(),
             started: Instant::now(),
+            source_override: None,
+            target_override: None,
         };
         self.publish(&s);
         Ok(job)
@@ -270,7 +278,9 @@ impl App {
                 if text.len() > 100000 {
                     bail!("inputTooLarge");
                 }
-                let job = self.begin("text", false).await?;
+                let overrides = overrides(&request)?;
+                let mut job = self.begin("text", false).await?;
+                (job.source_override, job.target_override) = overrides;
                 let id = job.id;
                 let app = self.clone();
                 tokio::spawn(async move {
@@ -281,6 +291,7 @@ impl App {
                 return Ok(json!({"v":1,"event":"ack","job":id}));
             }
             "retranslate" | "editBlock" => {
+                let overrides = overrides(&request)?;
                 let image = self.state.lock().await.snapshot.mode == "image";
                 if image {
                     let index = request["index"].as_u64();
@@ -288,7 +299,8 @@ impl App {
                     if source.len() > 10000 {
                         bail!("inputTooLarge");
                     }
-                    let job = self.begin("image", true).await?;
+                    let mut job = self.begin("image", true).await?;
+                    (job.source_override, job.target_override) = overrides;
                     self.update(&job, |s| {
                         if let Some(i) = index
                             && let Some(b) = s.snapshot.blocks.get_mut(i as usize)
@@ -305,7 +317,8 @@ impl App {
                     });
                 } else {
                     let text = self.state.lock().await.snapshot.source_text.clone();
-                    let job = self.begin("text", false).await?;
+                    let mut job = self.begin("text", false).await?;
+                    (job.source_override, job.target_override) = overrides;
                     let app = self.clone();
                     tokio::spawn(async move {
                         if let Err(e) = app.text(&job, text, "input").await {
@@ -677,16 +690,33 @@ impl App {
             .collect())
     }
     async fn translate_raw(&self, job: &Job, original: &[String], segments: &[String]) -> Result<Vec<String>> {
-        let (source, target) = job.settings.languages(&original.join(" "));
+        let text = original.join(" ");
+        let direction = job.settings.direction(
+            &text,
+            job.source_override.as_deref(),
+            job.target_override.as_deref(),
+        );
+        let (source, target) = (direction.source.clone(), direction.target.clone());
         self.update(job, |s| {
             s.snapshot.source_language = source.clone();
             s.snapshot.target_language = target.clone();
+            s.snapshot.target_reason = direction.reason.into();
             s.snapshot.status = "translating".into();
+            if s.snapshot.settings.learn(&text, &direction) {
+                let _ = s.snapshot.settings.save();
+            }
         })
         .await;
         if job.cancel.is_cancelled() {
             bail!("cancelled");
         }
+        // A shaky guess is still good enough to pick the target, but Google and
+        // LibreTranslate detect short text better themselves.
+        let source = if !direction.reliable && ["google", "libre"].contains(&job.settings.provider.as_str()) {
+            "auto".to_owned()
+        } else {
+            source
+        };
         if job.settings.provider == "local" {
             self.offline
                 .lock()
@@ -876,6 +906,23 @@ fn ui_string(key: &str) -> String {
             catalog[key].as_str().filter(|s| !s.is_empty()).map(str::to_owned)
         })
         .unwrap_or_else(|| "Couldn't translate and replace the selection.".into())
+}
+/// Optional per-request `source` and `target` language codes.
+fn overrides(request: &Value) -> Result<(Option<String>, Option<String>)> {
+    let code = |key: &str| -> Result<Option<String>> {
+        match request[key].as_str() {
+            None | Some("") => Ok(None),
+            Some(code)
+                if code.len() <= 12
+                    && code != "auto"
+                    && code.bytes().all(|b| b.is_ascii_alphabetic() || b == b'-') =>
+            {
+                Ok(Some(code.to_owned()))
+            }
+            Some(_) => bail!("invalidLanguage"),
+        }
+    };
+    Ok((code("source")?, code("target")?))
 }
 fn record_history(s: &mut State) {
     if s.snapshot.settings.history {

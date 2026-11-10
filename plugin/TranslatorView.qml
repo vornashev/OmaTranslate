@@ -21,10 +21,19 @@ Pane {
     property real zoom: 1
     property int selectedBlock: -1
     property bool syncing: false
-    property var settings: stateData.settings || ({provider:"google",source:"auto",target:"en",secondLanguage:"en",autoSwap:true,autoTranslate:true,debounceMs:250,minFontSize:12,ocrLanguages:"eng"})
+    property var settings: stateData.settings || ({provider:"google",source:"auto",target:"en",secondLanguage:"last",lastLanguage:"en",autoSwap:true,autoTranslate:true,debounceMs:250,minFontSize:12,ocrLanguages:"eng"})
+    // Languages picked in the panel or by the swap button. They apply to the text at
+    // hand only and are forgotten with it; the settings keep "my language" and auto mode.
+    property var overrides: ({})
+    readonly property string secondLanguage: settings.secondLanguage === "last" ? (settings.lastLanguage || "en") : (settings.secondLanguage || "en")
+    readonly property bool hasText: !!stateData.sourceText && !imageMode || imageMode && blocks.length > 0
+    // The direction of the text at hand, as the backend resolved it.
+    readonly property string currentSource: overrides.source || (hasText ? stateData.sourceLanguage || "" : "")
+    readonly property string currentTarget: overrides.target || (hasText && stateData.targetLanguage ? stateData.targetLanguage : settings.target || "en")
     // The job whose image the user closed. Image mode stays off for it even if the
     // backend still reports mode "image" (older backends kept it after dismiss).
     property int closedImageJob: -1
+    property int overridesJob: -1
     // Text that fits keeps the base size; up to twice the box steps down once, more than that twice.
     function fitSize(height, box, sizes) {
         return height <= box ? sizes[0] : height <= box * 2 ? sizes[1] : sizes[2]
@@ -37,7 +46,7 @@ Pane {
     // The backend's catalog, with the user's two languages pinned on top.
     readonly property var catalog: {
         const all = stateData.languages && stateData.languages.length ? stateData.languages : [{code:"en",name:"English",english:"English"}]
-        const pinned = [settings.target, settings.secondLanguage]
+        const pinned = [settings.target, secondLanguage]
         const top = all.filter(function(l) { return pinned.indexOf(l.code) >= 0 })
         return top.concat(all.filter(function(l) { return pinned.indexOf(l.code) < 0 }))
     }
@@ -66,16 +75,26 @@ Pane {
     function t(key) { return translate(key) }
     function send(request) { command(request) }
     function focusInput() { if (!imageMode && !settingsOpen && !historyOpen) source.forceActiveFocus(); else root.forceActiveFocus() }
-    function clearInput() { debounce.stop(); syncing = true; source.text = ""; syncing = false }
+    function clearInput() { debounce.stop(); overrides = ({}); syncing = true; source.text = ""; syncing = false }
+    // A translate request for the text at hand, with the panel's one-off languages.
+    function translateRequest(op, text) {
+        const request = {op: op}
+        if (text !== undefined) request.text = text
+        if (overrides.source) request.source = overrides.source
+        if (overrides.target) request.target = overrides.target
+        return request
+    }
     function patch(values, repeat) {
         debounce.stop()
         send({op:"setSettings",settings:values})
-        if (repeat && (stateData.sourceText || source.text)) {
-            if (imageMode) send({op:"retranslate"})
-            else send({op:"translate",text:source.text})
-        }
+        if (repeat && (stateData.sourceText || source.text)) submit()
     }
-    function submit() { debounce.stop(); if (imageMode) send({op:"retranslate"}); else send({op:"translate",text:source.text}) }
+    function submit() { debounce.stop(); send(imageMode ? translateRequest("retranslate") : translateRequest("translate", source.text)) }
+    // Applies languages to the text at hand only, and translates it again.
+    function override(values) {
+        overrides = Object.assign({}, overrides, values)
+        if (stateData.sourceText || source.text) submit()
+    }
     function fileUrl(path) { return path ? "file://" + encodeURI(path).replace(/#/g,"%23").replace(/\?/g,"%3F") : "" }
     function message(code) { const translated = t(code); return translated === code ? t("operationFailed") : translated }
     function languageName(code) { const i = languageCodes.indexOf(code); return i > 0 ? languageNames[i] : "" }
@@ -85,12 +104,18 @@ Pane {
     function closeImage() { closedImageJob = stateData.job || 0; clearInput(); send({op:"dismiss"}); Qt.callLater(focusInput) }
     function restore(entry) {
         historyOpen = false
+        overrides = ({})
         syncing = true; source.text = entry.source; syncing = false
         send({op:"translate", text: entry.source})
         Qt.callLater(focusInput)
     }
 
     onStateDataChanged: {
+        // New text from a selection, the clipboard or the screen starts without one-off languages.
+        if (stateData.sourceKind && stateData.sourceKind !== "input" && (stateData.job || 0) !== overridesJob) {
+            overridesJob = stateData.job || 0
+            overrides = ({})
+        }
         syncing = true
         if (stateData.sourceKind !== "input" || !source.activeFocus) source.text = stateData.sourceText || ""
         syncing = false
@@ -129,7 +154,7 @@ Pane {
     Keys.onEscapePressed: { if (settingsOpen) settingsOpen = false; else if (historyOpen) historyOpen = false; else dismiss() }
     Shortcut { sequence: "Ctrl+Return"; enabled: root.visible; onActivated: root.submit() }
     Shortcut { sequence: "Ctrl+Shift+C"; enabled: root.visible; onActivated: root.send({op:"copy",kind:"text"}) }
-    Timer { id: debounce; interval: root.settings.debounceMs || 250; onTriggered: root.send({op:"translate",text:source.text}) }
+    Timer { id: debounce; interval: root.settings.debounceMs || 250; onTriggered: root.send(root.translateRequest("translate", source.text)) }
     TextEdit { id: clipboardHelper; visible: false; textFormat: TextEdit.PlainText }
     // Consume clicks inside the card so the shell's outside-click surface cannot dismiss it.
     MouseArea { anchors.fill: parent; onPressed: function(mouse) { mouse.accepted = true } }
@@ -219,22 +244,28 @@ Pane {
                 theme: ui; translate: root.translate
                 codes: root.languageCodes; names: root.languageNames; aliases: root.languageAliases
                 offlineCodes: root.offlineCodes
-                current: root.settings.source || "auto"
-                readonly property bool detected: current === "auto" && !!root.stateData.sourceText && !!root.languageName(root.stateData.sourceLanguage)
+                current: root.overrides.source || root.settings.source || "auto"
+                readonly property bool detected: current === "auto" && root.hasText && !!root.languageName(root.stateData.sourceLanguage)
                 labelOverride: detected ? root.languageName(root.stateData.sourceLanguage) : ""
                 badge: detected ? root.t("badgeAuto") : ""
-                onPicked: function(code) { root.patch({source: code}, true) }
+                // For the text at hand only; "auto" goes back to detection.
+                onPicked: function(code) { root.override({source: code === "auto" ? "" : code}) }
             }
             OmaButton {
                 theme: ui; kind: "ghost"; iconName: "swap"; tip: root.t("swap")
-                onClicked: root.patch({source:root.settings.target,target:root.stateData.sourceLanguage||root.settings.secondLanguage||"en",autoSwap:false},true)
+                // Reverses the text at hand only; automatic mode stays on for the next text.
+                enabled: root.hasText && !!root.currentSource && root.currentSource !== root.currentTarget
+                onClicked: root.override({source: root.currentTarget, target: root.currentSource})
             }
             LanguagePicker {
                 theme: ui; translate: root.translate
                 codes: root.languageCodes.slice(1); names: root.languageNames.slice(1); aliases: root.languageAliases.slice(1)
                 offlineCodes: root.offlineCodes
-                current: root.settings.target || "en"
-                onPicked: function(code) { root.patch({target: code}, true) }
+                current: root.currentTarget
+                // "last": your own text goes to the language you worked with last.
+                badge: !root.overrides.target && root.hasText && root.stateData.targetReason === "last" ? root.t("badgeLast") : ""
+                // For the text at hand; a language other than your own also becomes the last one.
+                onPicked: function(code) { root.override({target: code}) }
             }
             Item { Layout.fillWidth: true }
             Segmented {

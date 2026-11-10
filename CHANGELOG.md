@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- "My language" and the last language: foreign text goes into your language, and text already in your language goes to the language you worked with last (the last foreign text you translated, or a target you picked by hand). The panel marks it with a "last" badge; Settings → General can pin one language instead.
+
+### Changed
+- Picking a source or target language and the ⇄ button in the panel apply to the text at hand only. The swap button no longer switches automatic mode off for good.
+- Older settings move to the new mode once: in a fixed language pair, the target becomes your language and the source the last language. Change "My language" in Settings → General if that guessed wrong.
+- When language detection is unsure, Google and LibreTranslate get "auto" instead of a guessed source language.
+
 ## [0.2.0] - 2026-11-10
 
 ### Added

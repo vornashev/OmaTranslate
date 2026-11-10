@@ -181,8 +181,8 @@
   "wayReplaceHint": "la selección se convierte en su traducción",
   "onboardingTitle4": "Puedes traducir sin abrir esta ventana",
   "replaced": "Selección reemplazada por su traducción",
-  "autoSwapTitle": "Texto en %1 → %2 automáticamente",
-  "autoSwapDesc": "Si el texto ya está en tu idioma de destino, se traduce a este idioma.",
+  "autoSwapTitle": "Texto en %1 → %2",
+  "autoSwapDesc": "El texto en tu idioma va al idioma con el que trabajaste por última vez: el del último texto extranjero traducido o un destino elegido a mano. O fija aquí un idioma.",
   "ocrMissingHelp": "El reconocimiento de %1 no está instalado: %2",
   "notifyNoSelection": "Primero selecciona el texto que quieres reemplazar por su traducción.",
   "notifyNetworkError": "No se puede conectar con el servicio de traducción.",
@@ -192,5 +192,9 @@
   "backendMissing": "El plugin está añadido, pero el backend de traducción aún no está instalado. Ejecuta esto una vez en una terminal y vuelve a abrir el panel:",
   "backendMissingTitle": "Completa la instalación",
   "copyCommand": "Copiar comando",
-  "barTooltip": "Clic izquierdo: traductor\nClic derecho: ajustes\nClic central: traducir el portapapeles"
+  "barTooltip": "Clic izquierdo: traductor\nClic derecho: ajustes\nClic central: traducir el portapapeles",
+  "myLanguageTitle": "Mi idioma",
+  "myLanguageDesc": "El texto en otros idiomas se traduce a este.",
+  "lastLanguage": "Último · %1",
+  "badgeLast": "último"
 }

@@ -34,7 +34,7 @@ def language_catalog():
 
 
 LANGUAGES = language_catalog()
-SETTINGS = dict(provider="google", source="auto", target="ru", autoTranslate=True, debounceMs=250, autoSwap=True, secondLanguage="en",
+SETTINGS = dict(provider="google", source="auto", target="ru", autoTranslate=True, debounceMs=250, autoSwap=True, secondLanguage="last", lastLanguage="en",
                 history=True, minFontSize=12, ocrLanguages="eng+rus", selectionKey="SUPER + U",
                 clipboardKey="SUPER + SHIFT + U", screenshotKey="SUPER + ALT + U", replaceKey="SUPER + CTRL + U",
                 glossary=[])
@@ -149,6 +149,8 @@ TranslatorView {{ readonly property var catalog: {json.dumps(self.catalog, ensur
             QTest.qWait(150)
             names.append(self.save(view, window, f"dark-08-settings-{section}"))
         shot("light-08-settings", DONE, w=1040, h=660, settingsOpen=True, theme="light")
+        shot("dark-11-last-language", dict(DONE, sourceText="Маленькие шаги многое меняют.", translated="Small steps make a big difference.",
+                                           sourceLanguage="ru", targetLanguage="en", targetReason="last"))
         shot("dark-10-backend-missing", dict(BASE, status="idle"), connectionError="backendMissing",
              installer="/home/user/.config/omarchy/plugins/vornashev.omatranslate/install.sh")
         view, window = self.view(DONE)

@@ -181,8 +181,8 @@
   "wayReplaceHint": "the selection turns into its translation in place",
   "onboardingTitle4": "You can translate without opening this window",
   "replaced": "Selection replaced with its translation",
-  "autoSwapTitle": "%1 text → %2 automatically",
-  "autoSwapDesc": "When the source is already in your target language, translate it into this language instead.",
+  "autoSwapTitle": "Text in %1 → %2",
+  "autoSwapDesc": "Text already in your language goes to the language you worked with last: the last foreign text you translated, or a target you picked by hand. Or pin one language here.",
   "ocrMissingHelp": "Text recognition for %1 isn't installed: %2",
   "notifyNoSelection": "Select the text to replace with its translation first.",
   "notifyNetworkError": "The translation service can't be reached.",
@@ -192,5 +192,9 @@
   "backendMissing": "The plugin is added, but its translation backend isn't installed yet. Run this once in a terminal, then reopen the panel:",
   "backendMissingTitle": "Finish the installation",
   "copyCommand": "Copy command",
-  "barTooltip": "Left click: translator\nRight click: settings\nMiddle click: translate clipboard"
+  "barTooltip": "Left click: translator\nRight click: settings\nMiddle click: translate clipboard",
+  "myLanguageTitle": "My language",
+  "myLanguageDesc": "Text in other languages is translated into it.",
+  "lastLanguage": "Last used · %1",
+  "badgeLast": "last"
 }

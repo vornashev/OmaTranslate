@@ -181,8 +181,8 @@
   "wayReplaceHint": "la sélection devient sa traduction sur place",
   "onboardingTitle4": "Vous pouvez traduire sans ouvrir cette fenêtre",
   "replaced": "Sélection remplacée par sa traduction",
-  "autoSwapTitle": "Texte en %1 → %2 automatiquement",
-  "autoSwapDesc": "Si le texte est déjà dans votre langue cible, il est traduit dans cette langue.",
+  "autoSwapTitle": "Texte en %1 → %2",
+  "autoSwapDesc": "Le texte déjà dans votre langue va vers la dernière langue utilisée : celle du dernier texte étranger traduit ou une cible choisie à la main. Ou fixez ici une langue.",
   "ocrMissingHelp": "La reconnaissance pour %1 n'est pas installée : %2",
   "notifyNoSelection": "Sélectionnez d'abord le texte à remplacer par sa traduction.",
   "notifyNetworkError": "Impossible de joindre le service de traduction.",
@@ -192,5 +192,9 @@
   "backendMissing": "Le plugin est ajouté, mais son moteur de traduction n'est pas encore installé. Lancez ceci une fois dans un terminal, puis rouvrez le panneau :",
   "backendMissingTitle": "Terminez l'installation",
   "copyCommand": "Copier la commande",
-  "barTooltip": "Clic gauche : traducteur\nClic droit : réglages\nClic milieu : traduire le presse-papiers"
+  "barTooltip": "Clic gauche : traducteur\nClic droit : réglages\nClic milieu : traduire le presse-papiers",
+  "myLanguageTitle": "Ma langue",
+  "myLanguageDesc": "Le texte dans les autres langues est traduit vers elle.",
+  "lastLanguage": "Dernière · %1",
+  "badgeLast": "dernière"
 }

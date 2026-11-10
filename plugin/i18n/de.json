@@ -181,8 +181,8 @@
   "wayReplaceHint": "die Markierung wird an Ort und Stelle zur Übersetzung",
   "onboardingTitle4": "Du kannst übersetzen, ohne dieses Fenster zu öffnen",
   "replaced": "Markierung durch die Übersetzung ersetzt",
-  "autoSwapTitle": "%1 Text → %2 automatisch",
-  "autoSwapDesc": "Ist der Text schon in deiner Zielsprache, wird er stattdessen in diese Sprache übersetzt.",
+  "autoSwapTitle": "Text auf %1 → %2",
+  "autoSwapDesc": "Text in deiner Sprache geht in die Sprache, mit der du zuletzt gearbeitet hast: die des zuletzt übersetzten fremden Texts oder ein von Hand gewähltes Ziel. Oder lege hier eine Sprache fest.",
   "ocrMissingHelp": "Texterkennung für %1 ist nicht installiert: %2",
   "notifyNoSelection": "Markiere zuerst den Text, der durch die Übersetzung ersetzt werden soll.",
   "notifyNetworkError": "Der Übersetzungsdienst ist nicht erreichbar.",
@@ -192,5 +192,9 @@
   "backendMissing": "Das Plugin ist hinzugefügt, aber das Übersetzungs-Backend ist noch nicht installiert. Führe das einmal im Terminal aus und öffne das Panel erneut:",
   "backendMissingTitle": "Installation abschließen",
   "copyCommand": "Befehl kopieren",
-  "barTooltip": "Linksklick: Übersetzer\nRechtsklick: Einstellungen\nMittelklick: Zwischenablage übersetzen"
+  "barTooltip": "Linksklick: Übersetzer\nRechtsklick: Einstellungen\nMittelklick: Zwischenablage übersetzen",
+  "myLanguageTitle": "Meine Sprache",
+  "myLanguageDesc": "Text in anderen Sprachen wird in sie übersetzt.",
+  "lastLanguage": "Zuletzt · %1",
+  "badgeLast": "zuletzt"
 }
