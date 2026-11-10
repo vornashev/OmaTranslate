@@ -188,5 +188,8 @@
   "notifyNetworkError": "无法连接到翻译服务。",
   "notifyRateLimited": "服务正在限制请求。请稍后再试或更换服务。",
   "notifyMissingTool": "需要 wtype：sudo pacman -S wtype",
-  "notifyReplaceFailed": "无法翻译并替换选中内容。"
+  "notifyReplaceFailed": "无法翻译并替换选中内容。",
+  "backendMissing": "插件已添加，但翻译后端尚未安装。请在终端中运行一次以下命令，然后重新打开面板：",
+  "backendMissingTitle": "完成安装",
+  "copyCommand": "复制命令"
 }

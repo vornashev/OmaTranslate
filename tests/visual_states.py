@@ -149,6 +149,8 @@ TranslatorView {{ readonly property var catalog: {json.dumps(self.catalog, ensur
             QTest.qWait(150)
             names.append(self.save(view, window, f"dark-08-settings-{section}"))
         shot("light-08-settings", DONE, w=1040, h=660, settingsOpen=True, theme="light")
+        shot("dark-10-backend-missing", dict(BASE, status="idle"), connectionError="backendMissing",
+             installer="/home/user/.config/omarchy/plugins/vornashev.omatranslate/install.sh")
         view, window = self.view(DONE)
         view.findChild(QObject, "providerMenu").setProperty("visible", True)
         QTest.qWait(250)

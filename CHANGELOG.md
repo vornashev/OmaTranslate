@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.2.0] - unreleased
+## [0.2.0] - 2026-11-10
 
 ### Added
 - 55 translation languages with offline detection (whatlang plus script rules); the language picker searches native and English names.
@@ -8,12 +8,15 @@
 - The target language and OCR languages follow the system locale on first run.
 - OCR language toggles for every installed Tesseract language, with a hint for the missing package.
 - Interface translations: Deutsch, Español, Français, Português, Українська, 简体中文, 日本語.
-- AUR recipe, GitHub CI and release workflow, `bin/i18n-check`.
+- A plugin added from the Omarchy Marketplace without its backend shows the install command with a copy button instead of waiting forever.
+- AUR recipe, GitHub CI and release workflow, `bin/i18n-check`; end-to-end daemon tests in Rust (`tests/daemon.rs`).
 
 ### Changed
 - `tesseract-data-rus` is optional; the installer adds Tesseract data for the system language.
 - "Translate and replace" notifications use the interface catalogs and the shell's language.
 - Updating a loaded plugin restarts the shell so the new interface is actually shown.
+- Text on images is recognised in two Tesseract passes, sparse text for interfaces and automatic layout, merged without duplicates. Labels on dark buttons and bold headings are no longer lost or split.
+- Translations drawn on images match the original's font size (accounting for ascenders and descenders) and weight. Headings no longer merge with the text under them, and the background patch covers only what the translation needs.
 
 ## [0.1.0]
 

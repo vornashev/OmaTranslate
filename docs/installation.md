@@ -66,13 +66,15 @@ Success is confirmed by `OmaTranslate installation completed successfully`, `Oma
 
 ## Omarchy Marketplace
 
-The root `manifest.json` follows the [Omarchy plugin catalog](https://plugins.omarchy.org/publish.html) format. `omarchy plugin add <git-url>` clones the QML plugin; it doesn't build the Rust backend. After adding the plugin, run once:
-
 ```bash
+omarchy plugin add https://github.com/vornashev/OmaTranslate --enable
 ~/.config/omarchy/plugins/vornashev.omatranslate/install.sh
 ```
 
-The installer keeps the git copy and builds in `~/.cache/omatranslate/`, so compilation doesn't trigger shell reloads. Repeat the command after `omarchy plugin update vornashev.omatranslate`. Don't enable the plugin before the first install: it needs the native backend.
+`omarchy plugin add` clones the QML plugin; it doesn't build the Rust backend, so run the installer once. Until then the panel shows the command with a copy button. The installer keeps the git copy and builds in `~/.cache/omatranslate/`, so compilation doesn't trigger shell reloads.
+
+- Update: `omarchy plugin update vornashev.omatranslate`, then run `install.sh` again.
+- Remove: `~/.config/omarchy/plugins/vornashev.omatranslate/install.sh --uninstall`. This removes the plugin directory, the bar button, the shortcuts and the package. `omarchy plugin remove` alone would leave the package and the shortcuts behind.
 
 ## Offline engine
 

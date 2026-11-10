@@ -188,5 +188,8 @@
   "notifyNetworkError": "Não é possível acessar o serviço de tradução.",
   "notifyRateLimited": "O serviço está limitando as solicitações. Tente mais tarde ou troque de serviço.",
   "notifyMissingTool": "É preciso o wtype: sudo pacman -S wtype",
-  "notifyReplaceFailed": "Não foi possível traduzir e substituir a seleção."
+  "notifyReplaceFailed": "Não foi possível traduzir e substituir a seleção.",
+  "backendMissing": "O plugin foi adicionado, mas o backend de tradução ainda não está instalado. Execute isto uma vez em um terminal e abra o painel de novo:",
+  "backendMissingTitle": "Conclua a instalação",
+  "copyCommand": "Copiar comando"
 }

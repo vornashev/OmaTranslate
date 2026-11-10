@@ -188,5 +188,8 @@
   "notifyNetworkError": "Нет связи с сервисом перевода.",
   "notifyRateLimited": "Сервис ограничил запросы. Попробуй позже или смени сервис.",
   "notifyMissingTool": "Нужен wtype: sudo pacman -S wtype",
-  "notifyReplaceFailed": "Не получилось перевести и заменить выделение."
+  "notifyReplaceFailed": "Не получилось перевести и заменить выделение.",
+  "backendMissing": "Плагин добавлен, но бэкенд перевода ещё не установлен. Выполни это один раз в терминале и открой панель снова:",
+  "backendMissingTitle": "Заверши установку",
+  "copyCommand": "Копировать команду"
 }

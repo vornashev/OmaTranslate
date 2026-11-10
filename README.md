@@ -20,7 +20,7 @@ Instant translation of selected text, the clipboard and screenshots for [Omarchy
 
 - **One keystroke.** Select text in any app and press <kbd>Super</kbd>+<kbd>U</kbd>. No copy, no browser tab.
 - **Translate in place.** <kbd>Super</kbd>+<kbd>Ctrl</kbd>+<kbd>U</kbd> replaces the selection with its translation, right in the app you're typing in.
-- **Screenshots, translated on the image.** Pick a screen region. Text is recognized locally with Tesseract and the translation is drawn over the original, cell by cell and paragraph by paragraph.
+- **Screenshots, translated on the image.** Pick a screen region. Text is recognized locally with Tesseract and the translation is drawn over the original in matching size and weight, cell by cell and paragraph by paragraph.
 - **55 languages, detected offline.** Your two languages (say German and English) are pinned. Text already in your language goes to the other one automatically.
 - **Names stay names.** CamelCase, product names and versions (`GPT-6`, `FrontierCode`, "Name 5.2") are not translated. Add your own terms to a do-not-translate list.
 - **Private by default.** Images never leave your machine; online services receive only the recognized text. History is off unless you turn it on. There's also a fully offline engine.
@@ -28,7 +28,18 @@ Instant translation of selected text, the clipboard and screenshots for [Omarchy
 
 ## Install
 
-On Omarchy 4, from a clone of this repository:
+OmaTranslate is an Omarchy 4 plugin with a native backend (Rust). Either way, one script builds the backend as an Arch package, adds the bar button and the shortcuts, and installs Tesseract data for your system language.
+
+**From the [Omarchy Marketplace](https://plugins.omarchy.org):**
+
+```bash
+omarchy plugin add https://github.com/vornashev/OmaTranslate --enable
+~/.config/omarchy/plugins/vornashev.omatranslate/install.sh
+```
+
+The first command adds the plugin; the second builds and installs the backend. Until you run it, the panel shows that command with a copy button.
+
+**From source:**
 
 ```bash
 git clone https://github.com/vornashev/OmaTranslate.git
@@ -36,11 +47,18 @@ cd OmaTranslate
 ./install.sh
 ```
 
-Run it as your user, not with `sudo`; the password is asked only for system packages. The script installs dependencies, builds and installs an Arch package, enables the plugin, adds the bar button and the shortcuts. It also adds Tesseract data for your system language. Run the same command to update.
+Run the script as your user, not with `sudo`: the password is asked only for system packages (Rust and build tools only if they're missing, plus Tesseract, wl-clipboard, grim, slurp and wtype). The first build takes a few minutes. Existing shortcuts are never overwritten.
 
 A translate button (文A) appears on the right of the bar: left click opens the translator, right click opens settings, middle click translates the clipboard.
 
-More options, the Omarchy Marketplace route and troubleshooting: [docs/installation.md](docs/installation.md).
+| | Marketplace | Source |
+|---|---|---|
+| Update | `omarchy plugin update vornashev.omatranslate`, then run `install.sh` again | `git pull && ./install.sh` |
+| Remove | `~/.config/omarchy/plugins/vornashev.omatranslate/install.sh --uninstall` | `./install.sh --uninstall` |
+
+Removing takes away the plugin, the bar button, the shortcuts and the package; settings, history and models are kept. More options and troubleshooting: [docs/installation.md](docs/installation.md).
+
+![A settings screen translated from English into German, right on the image](preview.png)
 
 ## Shortcuts
 
@@ -103,14 +121,6 @@ This creates a private Python environment with CTranslate2 and SentencePiece; no
 ## Contributing
 
 Bug reports, translations and new providers are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and tests. The architecture and IPC protocol are described in [docs/architecture.md](docs/architecture.md).
-
-## Uninstall
-
-```bash
-./install.sh --uninstall
-```
-
-This removes the integration and the package. Settings, history and models are kept.
 
 ## License
 

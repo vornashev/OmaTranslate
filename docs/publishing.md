@@ -44,6 +44,16 @@ Removal is `./install.sh --uninstall`. Settings, history and downloaded models a
 
 Submit the real public repository URL through the Marketplace's linked issue form only after the desktop checks pass. Submission and publication are separate user actions; the installer does neither.
 
+## Marketplace listing
+
+The marketplace rules live in [omacom/omarchy-plugin-marketplace](https://github.com/omacom/omarchy-plugin-marketplace) (`SUBMISSION.md`, `SECURITY.md`, `VERIFICATION.md`).
+
+- Listing card: `preview.png` at the repository root. The marketplace strips metadata and makes the card and detail images itself (up to 50 MB and 40 megapixels). It shows a real EN→DE run of the image pipeline; regenerate it after visible changes to image rendering or the panel.
+- Category `Productivity`; tags `hyprland`, `quickshell`, `bar`.
+- Installation is listed as manual: `omarchy plugin add` doesn't build the backend. Say so in the submission's maintainer notes and point to `install.sh`.
+- The Automated Security Baseline is a static scan of the exact commit. Expect `review-required` with the capabilities `installer`, `package-manager`, `privilege` and `remote-build` and no findings. A maintainer accepts those by hand. Never add `curl | sh`, unpinned `git clone` or `cargo install --git` builds, or `NOPASSWD` sudoers rules: those are findings that block the listing.
+- A listing is bound to one commit. After a release, open the [verification form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=verify-plugin.yml) with "Verify and publish a newer upstream commit", the plugin id and the full 40-character SHA of `main`. Until then the listing shows "Update unverified".
+
 ## Releases and AUR
 
 1. Bump the version in `Cargo.toml`, `manifest.json`, `pkgbuild/PKGBUILD` and `pkgbuild/aur/PKGBUILD` (reset `pkgrel=1`), then run `cargo update -p omatranslate --offline`.

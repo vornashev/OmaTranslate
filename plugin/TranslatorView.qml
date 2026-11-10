@@ -6,6 +6,7 @@ Pane {
     id: root
     property var stateData: ({})
     property string connectionError: ""
+    property string installer: ""
     property color backgroundColor: "#13171a"
     property color textColor: "#e3e7e8"
     property color accentColor: "#aac8ad"
@@ -49,7 +50,8 @@ Pane {
     }
     readonly property var history: stateData.history || []
     // empty | waiting | loading | error | done
-    readonly property string textState: connectionError ? "loading"
+    readonly property string textState: connectionError === "backendMissing" ? "setup"
+        : connectionError ? "loading"
         : stateData.error ? "error"
         : busy ? "loading"
         : stateData.translated ? "done"
@@ -387,6 +389,58 @@ Pane {
                         }
                         Item { Layout.fillWidth: true }
                         OmaButton { theme: ui; kind: "primary"; iconName: "copy"; text: root.t("copy"); enabled: false }
+                    }
+                }
+            }
+
+            // Setup: the plugin was added without its native backend; show the one command that fixes it.
+            Rectangle {
+                visible: root.textState === "setup"
+                Layout.fillWidth: true
+                implicitHeight: setupColumn.implicitHeight + 24
+                radius: ui.smallRadius + 2
+                color: ui.surface
+                border.color: ui.line
+                ColumnLayout {
+                    id: setupColumn
+                    anchors { left: parent.left; right: parent.right; top: parent.top; margins: 12; leftMargin: 14 }
+                    spacing: 10
+                    RowLayout {
+                        spacing: 10
+                        Icon { name: "alert"; color: ui.warn }
+                        Text {
+                            Layout.fillWidth: true
+                            text: root.t("backendMissingTitle")
+                            textFormat: Text.PlainText; wrapMode: Text.Wrap
+                            font.family: root.fontFamily; font.pixelSize: 14; font.weight: Font.DemiBold; color: ui.text
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.t("backendMissing")
+                        textFormat: Text.PlainText; wrapMode: Text.Wrap
+                        font.family: root.fontFamily; font.pixelSize: 12; lineHeight: 1.4; color: ui.muted
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: installCommand.implicitHeight + 16
+                        radius: ui.smallRadius
+                        color: ui.canvas
+                        TextEdit {
+                            id: installCommand
+                            anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; leftMargin: 10; rightMargin: 10 }
+                            text: root.installer
+                            readOnly: true; selectByMouse: true; wrapMode: TextEdit.WrapAnywhere
+                            font.family: root.fontFamily; font.pixelSize: 12; color: ui.text; selectionColor: ui.accentSoft
+                        }
+                    }
+                    OmaButton {
+                        id: copyCommand
+                        property bool done: false
+                        theme: ui; small: true; kind: "primary"; iconName: "copy"
+                        text: done ? root.t("copied") : root.t("copyCommand")
+                        onClicked: { root.copyText(root.installer); done = true; copiedReset.restart() }
+                        Timer { id: copiedReset; interval: 1600; onTriggered: copyCommand.done = false }
                     }
                 }
             }

@@ -188,5 +188,8 @@
   "notifyNetworkError": "翻訳サービスに接続できません。",
   "notifyRateLimited": "サービスがリクエストを制限しています。時間をおくか、サービスを切り替えてください。",
   "notifyMissingTool": "wtype が必要です: sudo pacman -S wtype",
-  "notifyReplaceFailed": "選択範囲を翻訳して置き換えられませんでした。"
+  "notifyReplaceFailed": "選択範囲を翻訳して置き換えられませんでした。",
+  "backendMissing": "プラグインは追加されましたが、翻訳バックエンドがまだインストールされていません。ターミナルで一度これを実行してから、パネルを開き直してください:",
+  "backendMissingTitle": "インストールを完了してください",
+  "copyCommand": "コマンドをコピー"
 }
