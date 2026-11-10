@@ -13,7 +13,7 @@ jobs:
     container: archlinux:latest
     steps:
       - name: Install build tools
-        run: pacman -Syu --noconfirm --needed git base-devel rust pkgconf cmake cairo pacman-contrib github-cli
+        run: pacman -Syu --noconfirm --needed git base-devel rust pkgconf cmake cairo tesseract tesseract-data-eng python pacman-contrib github-cli
       - uses: actions/checkout@v4
       - name: Check versions match the tag
         run: |
