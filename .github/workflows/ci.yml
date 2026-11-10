@@ -27,7 +27,7 @@ jobs:
             ~/.cargo/git
             target
           key: cargo-${{ hashFiles('Cargo.lock') }}
-      - name: Rust tests (unit and end-to-end: real daemon, Tesseract, renderer)
+      - name: Rust tests (unit and end-to-end with the real daemon, Tesseract, renderer)
         run: cargo test --locked
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
