@@ -191,5 +191,6 @@
   "notifyReplaceFailed": "无法翻译并替换选中内容。",
   "backendMissing": "插件已添加，但翻译后端尚未安装。请在终端中运行一次以下命令，然后重新打开面板：",
   "backendMissingTitle": "完成安装",
-  "copyCommand": "复制命令"
+  "copyCommand": "复制命令",
+  "barTooltip": "左键：翻译器\n右键：设置\n中键：翻译剪贴板"
 }

@@ -191,5 +191,6 @@
   "notifyReplaceFailed": "Não foi possível traduzir e substituir a seleção.",
   "backendMissing": "O plugin foi adicionado, mas o backend de tradução ainda não está instalado. Execute isto uma vez em um terminal e abra o painel de novo:",
   "backendMissingTitle": "Conclua a instalação",
-  "copyCommand": "Copiar comando"
+  "copyCommand": "Copiar comando",
+  "barTooltip": "Clique esquerdo: tradutor\nClique direito: configurações\nClique do meio: traduzir a área de transferência"
 }

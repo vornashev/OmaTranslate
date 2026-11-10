@@ -55,6 +55,14 @@ Item {
         onPressed: function(mouse) { button.pressed(mouse.button) } }
 }
 ''')
+        commons = imports / "qs/Commons"
+        commons.mkdir(parents=True)
+        (commons / "qmldir").write_text("module qs.Commons\nTranslations 1.0 Translations.qml\n")
+        english = (ROOT / "plugin/i18n/en.json").read_text()
+        (commons / "Translations.qml").write_text(f'''import QtQuick
+QtObject {{ property var directory: ""; readonly property var catalog: {english}
+    function t(key) {{ return catalog[key] || key }} }}
+''')
         engine = QQmlEngine()
         engine.addImportPath(str(imports))
         component = QQmlComponent(engine)
@@ -83,6 +91,8 @@ TranslateBar {{
         for button in (Qt.LeftButton, Qt.RightButton, Qt.MiddleButton):
             QTest.mouseClick(window, button, Qt.NoModifier, QPoint(32, 26))
         assert calls == ["omatranslate open", "omatranslate settings", "omatranslate clipboard"], calls
+        tooltip = widget.findChild(QObject, "translateBarButton").property("tooltipText")
+        assert tooltip.startswith("OmaTranslate\n") and all(w in tooltip for w in ("Left", "Right", "Middle")), tooltip
         window.grabWindow().save(str(OUT / "bar-harness.png"))
         window.close()
         widget.setParentItem(None)

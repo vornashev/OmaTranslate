@@ -191,5 +191,6 @@
   "notifyReplaceFailed": "No se pudo traducir y reemplazar la selección.",
   "backendMissing": "El plugin está añadido, pero el backend de traducción aún no está instalado. Ejecuta esto una vez en una terminal y vuelve a abrir el panel:",
   "backendMissingTitle": "Completa la instalación",
-  "copyCommand": "Copiar comando"
+  "copyCommand": "Copiar comando",
+  "barTooltip": "Clic izquierdo: traductor\nClic derecho: ajustes\nClic central: traducir el portapapeles"
 }

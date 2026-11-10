@@ -191,5 +191,6 @@
   "notifyReplaceFailed": "Die Markierung konnte nicht übersetzt und ersetzt werden.",
   "backendMissing": "Das Plugin ist hinzugefügt, aber das Übersetzungs-Backend ist noch nicht installiert. Führe das einmal im Terminal aus und öffne das Panel erneut:",
   "backendMissingTitle": "Installation abschließen",
-  "copyCommand": "Befehl kopieren"
+  "copyCommand": "Befehl kopieren",
+  "barTooltip": "Linksklick: Übersetzer\nRechtsklick: Einstellungen\nMittelklick: Zwischenablage übersetzen"
 }

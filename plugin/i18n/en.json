@@ -191,5 +191,6 @@
   "notifyReplaceFailed": "Couldn't translate and replace the selection.",
   "backendMissing": "The plugin is added, but its translation backend isn't installed yet. Run this once in a terminal, then reopen the panel:",
   "backendMissingTitle": "Finish the installation",
-  "copyCommand": "Copy command"
+  "copyCommand": "Copy command",
+  "barTooltip": "Left click: translator\nRight click: settings\nMiddle click: translate clipboard"
 }

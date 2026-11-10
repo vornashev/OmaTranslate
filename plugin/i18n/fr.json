@@ -191,5 +191,6 @@
   "notifyReplaceFailed": "Impossible de traduire et de remplacer la sélection.",
   "backendMissing": "Le plugin est ajouté, mais son moteur de traduction n'est pas encore installé. Lancez ceci une fois dans un terminal, puis rouvrez le panneau :",
   "backendMissingTitle": "Terminez l'installation",
-  "copyCommand": "Copier la commande"
+  "copyCommand": "Copier la commande",
+  "barTooltip": "Clic gauche : traducteur\nClic droit : réglages\nClic milieu : traduire le presse-papiers"
 }

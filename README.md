@@ -70,7 +70,7 @@ The 文A button on the right of the bar does three different things depending on
 | 🖱️ Right | Opens the panel straight on Settings |
 | 🖱️ Middle (wheel) | Translates the clipboard at once: text goes to the panel, an image is recognized and translated right on the image |
 
-The middle click is the fastest way to translate something you've copied, without touching the keyboard. Move the button like any other bar widget; reinstalling keeps its position.
+The middle click is the fastest way to translate something you've copied, without touching the keyboard. Hover the button to see this list as a tooltip, in your interface language. Move the button like any other bar widget; reinstalling keeps its position.
 
 ## Shortcuts
 
