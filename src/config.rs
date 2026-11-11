@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
     io::Write,
-    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
 
@@ -292,9 +291,7 @@ pub fn socket_path() -> PathBuf {
     }
     let root = env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(format!("/tmp/omatranslate-{}", unsafe { libc::geteuid() }))
-        });
+        .unwrap_or_else(runtime_fallback);
     let display: String = env::var("WAYLAND_DISPLAY")
         .unwrap_or_else(|_| "default".into())
         .chars()
@@ -309,9 +306,23 @@ pub fn socket_path() -> PathBuf {
         .collect();
     root.join(format!("omatranslate-{display}.sock"))
 }
+#[cfg(unix)]
+fn runtime_fallback() -> PathBuf {
+    PathBuf::from(format!("/tmp/omatranslate-{}", unsafe { libc::geteuid() }))
+}
+/// %TEMP% is already per user (under %LOCALAPPDATA%).
+#[cfg(windows)]
+fn runtime_fallback() -> PathBuf {
+    env::temp_dir().join("omatranslate")
+}
 pub fn private_dir(path: &Path) -> Result<()> {
     fs::create_dir_all(path)?;
-    fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+    }
+    // On Windows a directory under the user's profile inherits an owner-only ACL.
     Ok(())
 }
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {

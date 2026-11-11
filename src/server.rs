@@ -2,6 +2,7 @@ use crate::{
     protect,
     config::{self, Settings},
     images::{self, Block},
+    ipc,
     models::{self, Offline},
     process,
     providers::Providers,
@@ -10,17 +11,12 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
-    os::unix::{
-        fs::{OpenOptionsExt, PermissionsExt},
-        io::AsRawFd,
-    },
     path::PathBuf,
     sync::Arc,
     time::Instant,
 };
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    net::{UnixListener, UnixStream},
     sync::{Mutex, watch},
 };
 use tokio_util::sync::CancellationToken;
@@ -961,8 +957,8 @@ pub async fn frame<R: tokio::io::AsyncBufRead + Unpin>(reader: &mut R) -> Result
         serde_json::from_slice(&bytes).context("invalidRequest")?,
     ))
 }
-async fn connection(app: Arc<App>, socket: UnixStream) -> Result<()> {
-    let (read, write) = socket.into_split();
+async fn connection(app: Arc<App>, socket: ipc::ServerStream) -> Result<()> {
+    let (read, write) = tokio::io::split(socket);
     connection_io(app, read, write).await
 }
 async fn connection_io<R, W>(app: Arc<App>, read: R, mut write: W) -> Result<()>
@@ -1008,19 +1004,11 @@ pub async fn serve() -> Result<()> {
     if !parent.exists() {
         config::private_dir(parent)?;
     }
-    let lock = std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .mode(0o600)
-        .open(path.with_extension("lock"))?;
     // The lock file is private to the current runtime directory and held for the process lifetime.
-    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+    let Some(lock) = ipc::try_lock(&path)? else {
         return Ok(());
-    }
-    let _ = std::fs::remove_file(&path);
-    let listener = UnixListener::bind(&path)?;
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    };
+    let mut listener = ipc::Listener::bind(&path)?;
     let app = App::new()?;
     let probe = app.clone();
     tokio::spawn(async move {
@@ -1041,9 +1029,9 @@ pub async fn serve() -> Result<()> {
         probe.warm_models().await;
     });
     loop {
-        tokio::select! {_=tokio::signal::ctrl_c()=>break,connection=listener.accept()=>{let (socket,_)=connection?;let app=app.clone();tokio::spawn(async move{let _=self::connection(app,socket).await;});}}
+        tokio::select! {_=tokio::signal::ctrl_c()=>break,connection=listener.accept()=>{let socket=connection?;let app=app.clone();tokio::spawn(async move{let _=self::connection(app,socket).await;});}}
     }
-    std::fs::remove_file(path)?;
+    listener.close()?;
     drop(lock);
     Ok(())
 }

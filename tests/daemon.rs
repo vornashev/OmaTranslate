@@ -3,6 +3,9 @@
 //! Only translation inference is replaced by a deterministic worker fixture, so this
 //! says nothing about translation quality or model speed. Each test starts its own
 //! daemon in a private temporary home.
+//!
+//! It talks to the daemon over a Unix socket and checks file modes, so it is Unix-only.
+#![cfg(unix)]
 
 use serde_json::{json, Value};
 use std::fs;

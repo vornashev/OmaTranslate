@@ -1,6 +1,7 @@
 mod config;
 mod protect;
 mod images;
+mod ipc;
 mod languages;
 mod models;
 mod portal;
@@ -12,7 +13,6 @@ use serde_json::json;
 use std::{process::Stdio, time::Duration};
 use tokio::{
     io::{AsyncWriteExt, BufReader},
-    net::UnixStream,
     process::Command,
 };
 
@@ -123,9 +123,9 @@ async fn cli() -> Result<()> {
         }
     }
 }
-async fn connect() -> Result<UnixStream> {
+async fn connect() -> Result<ipc::ClientStream> {
     let path = config::socket_path();
-    if let Ok(socket) = UnixStream::connect(&path).await {
+    if let Ok(socket) = ipc::connect(&path).await {
         return Ok(socket);
     }
     Command::new(std::env::current_exe()?)
@@ -137,7 +137,7 @@ async fn connect() -> Result<UnixStream> {
         .context("serviceUnavailable")?;
     for _ in 0..50 {
         tokio::time::sleep(Duration::from_millis(20)).await;
-        if let Ok(socket) = UnixStream::connect(&path).await {
+        if let Ok(socket) = ipc::connect(&path).await {
             return Ok(socket);
         }
     }

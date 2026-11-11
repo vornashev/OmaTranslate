@@ -22,9 +22,11 @@ cairo-rs = { version = "0.18", default-features = false }
 sha2 = "0.10"
 zip = { version = "2.6", default-features = false, features = ["deflate"] }
 tempfile = "3.27"
-libc = "0.2"
 zbus = { version = "5.19", default-features = false, features = ["tokio"] }
 whatlang = "0.18.0"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [profile.release]
 lto = "thin"
