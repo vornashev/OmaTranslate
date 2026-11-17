@@ -305,6 +305,7 @@ impl App {
                         if let Some(i) = index
                             && let Some(b) = s.snapshot.blocks.get_mut(i as usize)
                         {
+                            b.corrected = true;
                             b.source = source;
                         }
                     })

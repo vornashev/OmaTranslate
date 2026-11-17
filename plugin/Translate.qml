@@ -50,6 +50,21 @@ Item {
             }
         }
     }
+    Process {
+        id: clipboardTypes
+        property int pending: 0
+        function requestPaste() {
+            ++pending
+            running = true
+        }
+        command: ["wl-paste", "--list-types"]
+        stdout: StdioCollector { id: offeredTypes; waitForEnd: true }
+        onExited: function(code) {
+            const count = pending
+            pending = 0
+            if (root.opened && count) view.pasteSource(code === 0 ? offeredTypes.text.trim().split(/\s+/) : [], count)
+        }
+    }
     Socket {
         id: socket
         path: root.socketPath
@@ -93,6 +108,7 @@ Item {
             fontFamily: Commons.Style.font.menuFamily
             translate: function(key) { return strings.t(key) }
             onCommand: function(request) { if (root.transportError !== "backendMissing") root.transportError = ""; root.send(request) }
+            onSourcePasteRequested: clipboardTypes.requestPaste()
             onDismiss: root.requestClose()
         }
     }

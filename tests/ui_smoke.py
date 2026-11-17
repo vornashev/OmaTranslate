@@ -11,7 +11,7 @@ os.environ["QT_QUICK_BACKEND"] = "software"
 os.environ["QT_QPA_PLATFORMTHEME"] = ""
 os.environ["QT_STYLE_OVERRIDE"] = ""
 os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
-from PySide6.QtCore import QUrl, QObject, QTimer, Qt, QPoint, qInstallMessageHandler
+from PySide6.QtCore import QUrl, QObject, QTimer, Qt, QPoint, QPointF, QMimeData, qInstallMessageHandler
 from PySide6.QtGui import QGuiApplication, QImage, QPainter, QFont, QColor
 from PySide6.QtQml import QQmlEngine, QQmlComponent, QQmlExpression
 from PySide6.QtQuick import QQuickWindow
@@ -99,6 +99,57 @@ TranslateBar {{
         del widget, component, window, engine
 
 
+def check_source_paste(view, window, source, commands):
+    clipboard = QGuiApplication.clipboard()
+    # The shell supplies the Wayland offer. Use Qt's offscreen clipboard here.
+    def paste_offer():
+        view.pasteSource(clipboard.mimeData().formats(), 1)
+    view.sourcePasteRequested.connect(paste_offer)
+    source.setProperty("text", "keep old text")
+    source.select(5, 8)
+    clipboard.setText("new")
+    QTest.keyClick(window, Qt.Key_V, Qt.ControlModifier)
+    assert source.property("text") == "keep new text"
+    data = QMimeData()
+    data.setText("image caption")
+    data.setData("image/png", b"image payload")
+    clipboard.setMimeData(data)
+    commands.clear()
+    QTest.keyClick(window, Qt.Key_V, Qt.ControlModifier)
+    QTest.qWait(320)
+    assert commands == [{"op": "clipboard"}], commands
+    assert source.property("text") == "keep new text"
+    view.sourcePasteRequested.disconnect(paste_offer)
+    clipboard.clear()
+
+
+def check_canvas(view, window, commands):
+    canvas = view.findChild(QObject, "imageCanvas")
+    picture = view.findChild(QObject, "previewImage")
+    def fragment_point():
+        return picture.mapToScene(QPointF(picture.width() * 0.4, picture.height() * 0.19)).toPoint()
+    anchor = fragment_point()
+    commands.clear()
+    for _ in range(5):
+        QTest.wheelEvent(window, anchor, QPoint(0, 120))
+    assert abs(view.property("zoom") - 1.25 ** 5) < 0.001
+    assert abs(fragment_point().x() - anchor.x()) <= 2, "zoom moved the label away from the pointer"
+    start = fragment_point()
+    old_x, old_y = (canvas.property(p) for p in ("contentX", "contentY"))
+    QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, start)
+    for step in range(1, 6):
+        QTest.mouseMove(window, start - QPoint(12 * step, 9 * step), 15)
+    QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, start - QPoint(60, 45))
+    assert canvas.property("contentX") > old_x + 10
+    assert canvas.property("contentY") > old_y + 10
+    assert view.property("selectedBlock") == -1, "drag selected a fragment"
+    QTest.wheelEvent(window, anchor, QPoint(0, -120))
+    assert abs(view.property("zoom") - 1.25 ** 4) < 0.001
+    QTest.mouseClick(window, Qt.LeftButton, Qt.NoModifier, fragment_point())
+    assert view.property("selectedBlock") == 0
+    assert not commands, commands
+
+
 def run():
     qInstallMessageHandler(message_handler)
     app = QGuiApplication(sys.argv)
@@ -148,6 +199,7 @@ TranslatorView {{ translate: function(key) {{ return catalog[key] || key }} }}''
     view.setProperty("stateData", state)
     assert QQmlExpression(engine.rootContext(), result, "textFormat === 0").evaluate()[0]
     assert text.property("text") == "A new phrase", "A response overwrote in-progress typing"
+    check_source_paste(view, window, text, commands)
     window.resize(1120, 780)
     view.setWidth(1040)
     view.setHeight(700)
@@ -176,6 +228,14 @@ TranslatorView {{ translate: function(key) {{ return catalog[key] || key }} }}''
     view.setProperty("settingsOpen", False)
     QTest.qWait(200)
     window.grabWindow().save(str(OUT / "image.png"))
+    state["translatedImage"] = str(OUT / "image.png")
+    view.setProperty("stateData", state)
+    view.focusInput()
+    QTest.keyPress(window, Qt.Key_Space)
+    assert view.property("peeking")
+    QTest.keyRelease(window, Qt.Key_Space)
+    assert not view.property("peeking") and not view.property("original")
+    check_canvas(view, window, commands)
     check_bar()
     errors = [m for m in messages if any(s in m for s in ("ReferenceError", "TypeError", "Unable to assign", "Binding loop", "Cannot assign", "is not a type"))]
     assert not errors, errors

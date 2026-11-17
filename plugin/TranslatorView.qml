@@ -18,6 +18,7 @@ Pane {
     property bool settingsOpen: false
     property bool historyOpen: false
     property bool original: false
+    property bool peeking: false
     property real zoom: 1
     property int selectedBlock: -1
     property bool syncing: false
@@ -71,10 +72,15 @@ Pane {
         : source.text.length > 0 ? "waiting" : "empty"
     signal command(var request)
     signal dismiss()
+    signal sourcePasteRequested()
 
     function t(key) { return translate(key) }
     function send(request) { command(request) }
-    function focusInput() { if (!imageMode && !settingsOpen && !historyOpen) source.forceActiveFocus(); else root.forceActiveFocus() }
+    function focusInput() {
+        if (settingsOpen || historyOpen) root.forceActiveFocus()
+        else if (imageMode) canvas.forceActiveFocus()
+        else source.forceActiveFocus()
+    }
     function clearInput() { debounce.stop(); overrides = ({}); syncing = true; source.text = ""; syncing = false }
     // A translate request for the text at hand, with the panel's one-off languages.
     function translateRequest(op, text) {
@@ -88,6 +94,16 @@ Pane {
         debounce.stop()
         send({op:"setSettings",settings:values})
         if (repeat && (stateData.sourceText || source.text)) submit()
+    }
+    function pasteSource(types, count) {
+        if (!source.activeFocus || !source.visible) return
+        const image = types.some(type => ["image/png", "image/jpeg", "image/webp"].includes(type))
+        if (image) {
+            debounce.stop()
+            send({op: "clipboard"})
+        } else {
+            for (let i = 0; i < count; ++i) source.paste()
+        }
     }
     function submit() { debounce.stop(); send(imageMode ? translateRequest("retranslate") : translateRequest("translate", source.text)) }
     // Applies languages to the text at hand only, and translates it again.
@@ -120,7 +136,10 @@ Pane {
         if (stateData.sourceKind !== "input" || !source.activeFocus) source.text = stateData.sourceText || ""
         syncing = false
     }
-    onImageModeChanged: { original = false; zoom = 1; selectedBlock = -1 }
+    onImageModeChanged: {
+        peeking = false; original = false; zoom = 1; selectedBlock = -1
+        if (imageMode && !settingsOpen && !historyOpen) Qt.callLater(focusInput)
+    }
     onSettingsOpenChanged: if (settingsOpen) historyOpen = false
 
     OmaTheme {
@@ -272,7 +291,7 @@ Pane {
                 visible: root.imageMode
                 theme: ui; itemHeight: 28
                 model: [root.t("showTranslation"), root.t("showOriginal")]
-                currentIndex: root.original ? 1 : 0
+                currentIndex: root.original || root.peeking ? 1 : 0
                 onActivated: function(index) { root.original = index === 1 }
             }
             Rectangle {
@@ -282,14 +301,14 @@ Pane {
                 Row {
                     id: zoomRow
                     anchors.centerIn: parent
-                    OmaButton { theme: ui; kind: "ghost"; small: true; iconName: "minus"; tip: root.t("zoomOut"); onClicked: root.zoom = Math.max(0.25, root.zoom / 1.25) }
+                    OmaButton { theme: ui; kind: "ghost"; small: true; iconName: "minus"; tip: root.t("zoomOut"); onClicked: canvas.zoomAt(root.zoom / 1.25) }
                     Text {
                         width: 46; height: 28; text: Math.round(root.zoom * 100) + "%"; textFormat: Text.PlainText
                         horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                         font.family: root.fontFamily; font.pixelSize: 12; color: ui.text
                     }
-                    OmaButton { theme: ui; kind: "ghost"; small: true; iconName: "plus"; tip: root.t("zoomIn"); onClicked: root.zoom = Math.min(5, root.zoom * 1.25) }
-                    OmaButton { theme: ui; kind: "ghost"; small: true; iconName: "fit"; tip: root.t("fit"); onClicked: root.zoom = 1 }
+                    OmaButton { theme: ui; kind: "ghost"; small: true; iconName: "plus"; tip: root.t("zoomIn"); onClicked: canvas.zoomAt(root.zoom * 1.25) }
+                    OmaButton { theme: ui; kind: "ghost"; small: true; iconName: "fit"; tip: root.t("fit"); onClicked: canvas.zoomAt(1) }
                 }
             }
         }
@@ -328,6 +347,12 @@ Pane {
                             color: ui.text; selectionColor: ui.accent; selectedTextColor: ui.onAccent
                             font.pixelSize: root.fitSize(sourceMeasure.contentHeight, 150 - 8, [15, 14, 13]); font.family: root.fontFamily; wrapMode: TextEdit.Wrap; textFormat: TextEdit.PlainText
                             background: null; padding: 0; topPadding: 2; selectByMouse: true
+                            Keys.onPressed: function(event) {
+                                if (event.matches(StandardKey.Paste)) {
+                                    event.accepted = true
+                                    root.sourcePasteRequested()
+                                }
+                            }
                             onTextChanged: if (!root.syncing && activeFocus && root.settings.autoTranslate) debounce.restart()
                         }
                     }
@@ -585,19 +610,57 @@ Pane {
                 Layout.fillWidth: true; Layout.fillHeight: true
                 color: ui.canvas; radius: ui.smallRadius + 2; border.color: ui.line; clip: true
                 Flickable {
-                    id: canvas; anchors.fill: parent; anchors.margins: 16; clip: true
+                    id: canvas; objectName: "imageCanvas"; anchors.fill: parent; anchors.margins: 16; clip: true
+                    onActiveFocusChanged: if (!activeFocus) root.peeking = false
+                    onVisibleChanged: if (!visible) root.peeking = false
+                    Keys.onSpacePressed: function(event) {
+                        event.accepted = event.modifiers === Qt.NoModifier && !!root.stateData.translatedImage
+                        if (event.accepted) root.peeking = true
+                    }
+                    Keys.onReleased: function(event) {
+                        if (event.key === Qt.Key_Space && root.peeking) {
+                            if (!event.isAutoRepeat) root.peeking = false
+                            event.accepted = true
+                        }
+                    }
                     contentWidth: Math.max(width, picture.width); contentHeight: Math.max(height, picture.height)
                     boundsBehavior: Flickable.StopAtBounds
+                    acceptedButtons: Qt.LeftButton
+                    function zoomAt(value, x = width / 2, y = height / 2) {
+                        const next = Math.max(0.25, Math.min(5, value))
+                        if (next === root.zoom || !picture.width || !picture.height) return
+                        cancelFlick()
+                        const u = (contentX + x - picture.x) / picture.width
+                        const v = (contentY + y - picture.y) / picture.height
+                        root.zoom = next
+                        contentX = Math.max(0, Math.min(contentWidth - width, picture.x + u * picture.width - x))
+                        contentY = Math.max(0, Math.min(contentHeight - height, picture.y + v * picture.height - y))
+                    }
+                    HoverHandler {
+                        cursorShape: canvas.dragging ? Qt.ClosedHandCursor
+                                     : root.zoom > 1 ? Qt.OpenHandCursor : Qt.ArrowCursor
+                    }
+                    WheelHandler {
+                        parent: canvas.contentItem
+                        target: null
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        onWheel: function(event) {
+                            const steps = event.pixelDelta.y ? event.pixelDelta.y / 80 : event.angleDelta.y / 120
+                            const pos = canvas.contentItem.mapToItem(canvas, event.x, event.y)
+                            canvas.zoomAt(root.zoom * Math.pow(1.25, steps), pos.x, pos.y)
+                            event.accepted = true
+                        }
+                    }
                     ScrollBar.horizontal: ScrollBar {}
                     ScrollBar.vertical: ScrollBar {}
                     Image {
-                        id: picture
+                        id: picture; objectName: "previewImage"
                         readonly property real fitScale: Math.min(canvas.width / Math.max(1, root.stateData.imageWidth || 1), canvas.height / Math.max(1, root.stateData.imageHeight || 1))
                         readonly property real k: fitScale * root.zoom
                         width: (root.stateData.imageWidth || 1) * k
                         height: (root.stateData.imageHeight || 1) * k
                         x: Math.max(0, (canvas.width - width) / 2); y: Math.max(0, (canvas.height - height) / 2)
-                        source: root.fileUrl(root.original || !root.stateData.translatedImage ? root.stateData.originalImage : root.stateData.translatedImage)
+                        source: root.fileUrl(root.original || root.peeking || !root.stateData.translatedImage ? root.stateData.originalImage : root.stateData.translatedImage)
                         cache: false; asynchronous: true; fillMode: Image.PreserveAspectFit
                         Repeater {
                             model: root.blocks
@@ -625,7 +688,7 @@ Pane {
                                 MouseArea {
                                     id: blockHover
                                     anchors.fill: parent; anchors.margins: -3; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: { root.selectedBlock = blockArea.index; fragments.positionViewAtIndex(blockArea.index, ListView.Contain) }
+                                    onClicked: { canvas.forceActiveFocus(); root.selectedBlock = blockArea.index; fragments.positionViewAtIndex(blockArea.index, ListView.Contain) }
                                 }
                             }
                         }

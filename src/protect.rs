@@ -63,6 +63,21 @@ fn mixed(word: &str) -> bool {
     word.chars().any(|c| c.is_ascii_digit()) && word.chars().any(char::is_alphabetic)
 }
 
+/// Domain-like labels and account handles in screenshots.
+fn screen_identifier(word: &str) -> bool {
+    if let Some(handle) = word.strip_prefix('@') {
+        return !handle.is_empty() && handle.chars().all(|c| c.is_alphanumeric() || c == '_');
+    }
+    word.rsplit_once('.').is_some_and(|(name, suffix)| {
+        !name.is_empty()
+            && name.split('.').all(|label| {
+                !label.is_empty() && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+            })
+            && suffix.len() >= 2
+            && suffix.bytes().all(|b| b.is_ascii_lowercase())
+    })
+}
+
 /// A version after a name: 5.2, 2.0, 4, 0.1 — but not a year like 2026.
 fn version(word: &str) -> bool {
     let digits = word.chars().filter(|c| c.is_ascii_digit()).count();
@@ -101,7 +116,7 @@ pub fn protect(text: &str, glossary: &[String], names: bool) -> Protected {
     let mut keep = vec![false; words.len()];
     for i in 0..words.len() {
         let w = token(i);
-        if camel(w) || mixed(w) {
+        if camel(w) || mixed(w) || (names && screen_identifier(w)) {
             keep[i] = true;
         }
         let named_version = version(w) && i > 0 && capitalized(token(i - 1));
@@ -163,6 +178,8 @@ mod tests {
 
     #[test]
     fn product_names_and_versions_are_kept_in_screens() {
+        assert!(protect("Orchestrator.inc", &[], true).is_untranslatable());
+        assert_eq!(protect("Follow @username.", &[], true).text, "Follow ZX0Q.");
         let p = protect("Fable 5.2", &[], true);
         assert!(p.is_untranslatable());
         assert_eq!(p.original(), "Fable 5.2");

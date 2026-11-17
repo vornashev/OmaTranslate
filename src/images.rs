@@ -16,6 +16,9 @@ pub struct Block {
     pub translated: String,
     pub confidence: f64,
     pub overflow: bool,
+    /// The source was corrected in the fragment editor.
+    #[serde(default)]
+    pub corrected: bool,
     /// Text lines in the original, for sizing the translation like the source.
     #[serde(default)]
     pub lines: u32,
@@ -244,6 +247,14 @@ fn group(words: Vec<(LineKey, Word)>) -> Result<Vec<Block>> {
         let line_height = words.iter().map(|w| w.3).max().unwrap_or(1);
         let mut current: Option<Segment> = None;
         for (x, y, w, h, text, confidence) in words {
+            // A small, isolated bullet between navigation links is often read
+            // as a star, dash or guillemet. Keep its pixels between the labels.
+            if h * 2 < line_height && matches!(text.as_str(), "•" | "·" | "*" | "-" | "»")
+                && current.as_ref().is_some_and(|s| x - s.right >= line_height / 4)
+            {
+                segments.extend(current.take());
+                continue;
+            }
             let gap = current.as_ref().map(|s| x - s.right);
             if let (Some(s), Some(gap)) = (current.as_mut(), gap)
                 && gap <= (line_height * 3 / 2).max(12)
@@ -328,7 +339,7 @@ fn group(words: Vec<(LineKey, Word)>) -> Result<Vec<Block>> {
     }
     Ok(result)
 }
-fn background(image: &DynamicImage, b: &Block) -> [f64; 3] {
+fn background(image: &DynamicImage, b: &Block) -> [u8; 3] {
     let mut channels = [Vec::new(), Vec::new(), Vec::new()];
     let mut sample = |x: i32, y: i32| {
         let p = image.get_pixel(
@@ -349,52 +360,155 @@ fn background(image: &DynamicImage, b: &Block) -> [f64; 3] {
     }
     channels.map(|mut c| {
         c.sort_unstable();
-        f64::from(c.get(c.len() / 2).copied().unwrap_or(255)) / 255.0
+        c.get(c.len() / 2).copied().unwrap_or(255)
     })
 }
-/// How far a block may grow to the right over plain background: up to the next
-/// text, rule or image edge, so a longer translation can use the empty part of
-/// its cell instead of overflowing.
-fn free_right(image: &DynamicImage, b: &Block, bg: [f64; 3]) -> i32 {
-    let limit = (image.width() as i32 - 1).min(b.x + b.width + (b.width * 2).max(160));
-    let rows: Vec<i32> = (b.y.max(0)..(b.y + b.height).min(image.height() as i32))
-        .step_by((b.height / 12).max(1) as usize)
-        .collect();
-    let close = |x: i32| {
-        rows.iter().all(|&y| {
-            let p = image.get_pixel(x as u32, y as u32);
-            // Tight enough to stop at the edge of a sidebar or a card a few shades off.
-            (0..3).all(|i| (f64::from(p[i]) / 255.0 - bg[i]).abs() < 0.03)
-        })
-    };
-    let start = b.x + b.width + 2;
-    let mut x = start;
-    while x <= limit && close(x) {
-        x += 1;
-    }
-    // Keep a gap before whatever stopped the scan.
-    (x - start - 10).max(0)
+fn distance(pixel: image::Rgba<u8>, bg: [u8; 3]) -> usize {
+    (0..3).map(|i| pixel[i].abs_diff(bg[i])).max().unwrap() as usize
 }
 
-/// Share of a block's pixels that are text ink, relative to its font size.
-///
-/// Bold text puts roughly half as much ink again into the same box as regular
-/// text, so comparing a block with the image's median tells headings apart.
-fn ink(image: &DynamicImage, b: &Block, bg: [f64; 3], em: f64) -> f64 {
-    let (mut dark, mut total) = (0u32, 0u32);
-    let step = ((b.width.min(b.height)) / 40).max(1) as usize;
-    for y in (b.y.max(0)..(b.y + b.height).min(image.height() as i32)).step_by(step) {
-        for x in (b.x.max(0)..(b.x + b.width).min(image.width() as i32)).step_by(step) {
+/// Space up to the nearest visible content on either side of a line.
+fn margin(image: &DynamicImage, b: &Block, bg: [u8; 3], right: bool) -> i32 {
+    let (start, step) = if right {
+        (b.x + b.width + 2, 1)
+    } else {
+        (b.x - 3, -1)
+    };
+    let mut x = start;
+    while (0..image.width() as i32).contains(&x)
+        && (b.y..b.y + b.height)
+            .step_by((b.height / 24).max(1) as usize)
+            .all(|y| distance(image.get_pixel(x as u32, y as u32), bg) < 8)
+    {
+        x += step;
+    }
+    (x - start).abs()
+}
+
+struct Lettering {
+    color: [f64; 3],
+    bold: bool,
+    glyph_height: f64,
+    plain_background: bool,
+}
+
+/// Sample the strokes inside the OCR box. A high contrast percentile finds
+/// their colour without picking antialiased edges or a single stray bright pixel.
+fn lettering(image: &DynamicImage, b: &Block, bg: [u8; 3], em: f64) -> Lettering {
+    let mut histogram = [0usize; 256];
+    let mut colors = [[0usize; 3]; 256];
+    let dx = (b.width / 384).max(1) as usize;
+    let dy = (b.height / 120).max(1) as usize;
+    let mut rows = Vec::new();
+    for y in (b.y..b.y + b.height).step_by(dy) {
+        let mut row = [0usize; 256];
+        let mut count = 0;
+        for x in (b.x..b.x + b.width).step_by(dx) {
             let p = image.get_pixel(x as u32, y as u32);
-            let distance = (0..3).map(|i| (f64::from(p[i]) / 255.0 - bg[i]).abs()).fold(0.0, f64::max);
-            total += 1;
-            if distance > 0.35 {
-                dark += 1;
+            let d = distance(p, bg);
+            histogram[d] += 1;
+            for (i, sum) in colors[d].iter_mut().enumerate() {
+                *sum += usize::from(p[i]);
+            }
+            row[d] += 1;
+            count += 1;
+        }
+        let mut visible = 0;
+        let contrast = (0..256)
+            .rev()
+            .find(|&d| {
+                visible += row[d];
+                visible * 24 >= count
+            })
+            .unwrap_or(0);
+        rows.push(contrast);
+    }
+    let samples: usize = histogram.iter().sum();
+    let mut tail = 0;
+    let peak = (0..256)
+        .rev()
+        .find(|&d| {
+            tail += histogram[d];
+            tail * 50 >= samples
+        })
+        .unwrap_or(0);
+    let color = colors[peak].map(|sum| sum as f64 / histogram[peak].max(1) as f64 / 255.0);
+    let lines = f64::from(b.lines.max(1));
+    let ink: usize = histogram[(peak / 2).max(1)..].iter().sum();
+    let density = ink as f64 / samples.max(1) as f64 * f64::from(b.height) / (lines * em);
+    Lettering {
+        color,
+        bold: density >= 0.265,
+        glyph_height: (rows.iter().filter(|r| **r >= (peak / 3).max(12)).count() * dy) as f64
+            / lines,
+        plain_background: histogram[..12].iter().sum::<usize>() * 4 >= samples,
+    }
+}
+
+/// OCR can include the underline in a link's bounds or miss it by a few pixels.
+fn underline(image: &DynamicImage, b: &Block, bg: [u8; 3]) -> Option<i32> {
+    if b.lines > 1 || b.width < 8 {
+        return None;
+    }
+    let bottom = b.y + b.height;
+    (bottom - 2..=(bottom + 4).min(image.height() as i32 - 1))
+        .filter(|&y| y >= 0)
+        .find(|&y| {
+            let ink = |x: i32| {
+                (0..image.width() as i32).contains(&x)
+                    && distance(image.get_pixel(x as u32, y as u32), bg) > 32
+            };
+            !ink(b.x - 3)
+                && !ink(b.x + b.width + 3)
+                && (b.x..b.x + b.width).filter(|&x| ink(x)).count() * 10 >= b.width as usize * 9
+        })
+}
+
+/// A row of endonyms is a language picker. Some of its scripts may not be
+/// installed in Tesseract, so preserve the whole row, including unreadable names.
+fn language_menu(blocks: &[Block]) -> Vec<bool> {
+    let short = |b: &Block| b.lines == 1 && b.source.split_whitespace().count() <= 3;
+    let is_name = |b: &Block| crate::languages::LANGUAGES.iter().any(|l| l.3 == b.source);
+    let mut order: Vec<_> = (0..blocks.len()).filter(|&i| short(&blocks[i])).collect();
+    order.sort_by_key(|&i| blocks[i].x);
+    let mut menu = vec![false; blocks.len()];
+    for (i, anchor) in blocks.iter().enumerate() {
+        if !is_name(anchor) || menu[i] {
+            continue;
+        }
+        let row: Vec<_> = order
+            .iter()
+            .copied()
+            .filter(|&j| (blocks[j].y - anchor.y).abs() <= anchor.height / 2)
+            .collect();
+        // Allow for a short name in a script omitted entirely by OCR.
+        for labels in row
+            .chunk_by(|&a, &b| blocks[b].x - (blocks[a].x + blocks[a].width) <= 6 * anchor.height)
+        {
+            if labels.contains(&i) && labels.iter().filter(|&&j| is_name(&blocks[j])).count() >= 2 {
+                for &j in labels {
+                    menu[j] = true;
+                }
             }
         }
     }
-    // Stroke width grows with the font, ink share does not: normalise by height/em.
-    f64::from(dark) / f64::from(total.max(1)) * f64::from(b.height) / em.max(1.0)
+    menu
+}
+
+/// Use at most two additional lines of empty background below a paragraph.
+fn paragraph_room(image: &DynamicImage, b: &Block, bg: [u8; 3], em: f64) -> f64 {
+    if b.lines <= 1 {
+        return 0.0;
+    }
+    let bottom = b.y + b.height;
+    let end = image.height().min((bottom + (3.0 * em) as i32) as u32) as i32;
+    let rows = (bottom + 2..end)
+        .take_while(|&y| {
+            (b.x..b.x + b.width)
+                .all(|x| distance(image.get_pixel(x as u32, y as u32), bg) < 8)
+        })
+        .count();
+    (rows as f64 - em * 0.35).max(0.0)
 }
 
 fn wrap(ctx: &Painter, text: &str, width: f64) -> Result<Option<Vec<String>>> {
@@ -433,7 +547,6 @@ pub fn render(original: &DynamicImage, blocks: &mut [Block], minimum: u32) -> Re
         ImageSurface::create_for_data(pixels, Format::ARgb32, w as i32, h as i32, stride)?;
     {
         let ctx = Painter::new(&surface)?;
-        ctx.select_font_face("sans-serif", FontSlant::Normal, FontWeight::Normal);
         // Tesseract sometimes boxes a word far taller than its letters; the median
         // font size of the image keeps one such block from getting a huge font.
         let em_of = |b: &Block| {
@@ -446,93 +559,126 @@ pub fn render(original: &DynamicImage, blocks: &mut [Block], minimum: u32) -> Re
         let mut sizes: Vec<f64> = blocks.iter().map(em_of).collect();
         sizes.sort_by(f64::total_cmp);
         let typical = sizes.get(sizes.len() / 2).copied().unwrap_or(16.0);
-        let inks: Vec<f64> = blocks
-            .iter()
-            .map(|b| ink(original, b, background(original, b), em_of(b)))
-            .collect();
-        let mut sorted = inks.clone();
-        sorted.sort_by(f64::total_cmp);
-        // The lower quartile is regular text even when many blocks are bold.
-        let usual_ink = sorted.get(sorted.len() / 4).copied().unwrap_or(0.0);
-        for (index, b) in blocks.iter_mut().enumerate() {
-            if b.translated.is_empty() {
+        // Repeated left edges in a table or list take precedence over apparently
+        // equal margins around an individual label.
+        let left_aligned: Vec<_> = blocks.iter().map(|b| blocks.iter().any(|other| {
+            let dy = (b.y - other.y).abs();
+            (b.x - other.x).abs() <= 3 && (b.width - other.width).abs() > 8
+                && dy >= b.height && f64::from(dy) <= em_of(b) * 8.0
+        })).collect();
+        let menus = language_menu(blocks);
+        for ((b, menu), left_aligned) in blocks.iter_mut().zip(menus).zip(left_aligned) {
+            b.overflow = false;
+            if b.translated.is_empty()
+                || (!b.corrected && (b.translated == b.source || menu || b.confidence < 80.0))
+            {
                 continue;
             }
-            let x = (b.x - 2).max(0) as f64;
-            let y = (b.y - 2).max(0) as f64;
-            let width = ((b.width + 4) as f64).min(w as f64 - x);
-            let height = ((b.height + 4) as f64).min(h as f64 - y);
-            if width <= 0.0 || height <= 0.0 {
+            if b.width <= 0
+                || b.height <= 0
+                || b.x < 0
+                || b.y < 0
+                || b.x + b.width > w as i32
+                || b.y + b.height > h as i32
+            {
                 continue;
             }
-            let [r, g, blue] = background(original, b);
-            let room = (width + f64::from(free_right(original, b, [r, g, blue]))).min(w as f64 - x);
-            ctx.save()?;
-            let bold = usual_ink > 0.0 && inks[index] > usual_ink * 1.35;
+            let bg = background(original, b);
+            let [r, g, blue] = bg.map(|v| f64::from(v) / 255.0);
+            let em = em_of(b).max(1.0);
+            let style = lettering(original, b, bg, em);
+            // Tiny lettering, decorated badges and photos cannot be faithfully
+            // replaced with a rectangle. Their translations stay in the sidebar.
+            if !style.plain_background || style.glyph_height < 8.0 {
+                continue;
+            }
+            let rule = underline(original, b, bg);
+            let left = margin(original, b, bg, false);
+            let right = margin(original, b, bg, true);
+            let centered = !left_aligned && b.lines <= 1
+                && left.min(right) as f64 > em * 2.0
+                && (left - right).abs() as f64 <= em;
+            let extra = if b.lines > 1 {
+                0
+            } else if centered {
+                2 * (left.min(right) - 8).max(0)
+            } else {
+                (right - 8).max(0)
+            };
+            let x = f64::from(b.x);
+            let y = f64::from(b.y);
+            let width = f64::from(b.width);
+            let height = f64::from(b.height);
+            let room = width + f64::from(extra);
+            let below = paragraph_room(original, b, bg, em);
+
             ctx.select_font_face(
                 "sans-serif",
                 FontSlant::Normal,
-                if bold { FontWeight::Bold } else { FontWeight::Normal },
+                if style.bold {
+                    FontWeight::Bold
+                } else {
+                    FontWeight::Normal
+                },
             );
-            // Size the translation like the original text, but never below the
-            // user's minimum unless the original itself is smaller than that.
-            let em = em_of(b).max(1.0);
             let largest = em.min(typical * 2.5).clamp(7.0, 72.0).round() as u32;
             let smallest = minimum.min(em as u32).max(7).min(largest);
-            // A single line may use a little height around its box: the box only
-            // covers the glyphs present ("Overview" has no descender, "Überblick" has dots).
-            let slack = if b.lines <= 1 { (em * 0.3).max(3.0) } else { 0.0 };
+            // Preserve the source baseline spacing in wrapped paragraphs.
+            let pitch = if b.lines > 1 {
+                (height - style.glyph_height) / f64::from(b.lines - 1)
+            } else {
+                0.0
+            };
             let mut fitted = None;
             for size in (smallest..=largest).rev() {
-                ctx.set_font_size(size as f64);
-                if let Some(lines) = wrap(&ctx, &b.translated, room - 4.0)? {
+                ctx.set_font_size(f64::from(size));
+                if let Some(lines) = wrap(&ctx, &b.translated, room)? {
+                    if b.lines <= 1 && lines.len() > 1 {
+                        continue;
+                    }
                     let extent = ctx.font_extents()?;
-                    if extent.height() * lines.len() as f64 <= height + slack + extent.descent() {
-                        fitted = Some((lines, extent));
+                    let advance = extent.height().max(pitch * f64::from(size) / em);
+                    let baseline = ctx.text_extents(&lines[0])?;
+                    let last = ctx.text_extents(lines.last().unwrap())?;
+                    let needed = -baseline.y_bearing()
+                        + (lines.len() - 1) as f64 * advance
+                        + last.y_bearing()
+                        + last.height();
+                    if needed <= height + below + 2.0 {
+                        fitted = Some((lines, advance, baseline.y_bearing(), needed));
                         break;
                     }
                 }
             }
-            // A translation that does not fit is left out of the image: the
-            // original stays readable and the fragment card holds the full text.
             b.overflow = fitted.is_none();
-            if let Some((lines, extent)) = fitted {
-                // Cover the original box and only as much extra room as the translation uses.
-                let mut used = 0.0f64;
-                for line in &lines {
-                    used = used.max(ctx.text_extents(line)?.x_advance());
-                }
-                // A little past the original box too: OCR often leaves out a final
-                // period or the tail of a glyph, which would show next to a shorter translation.
-                let width = width
-                    .max(used + 6.0)
-                    .min(room)
-                    .max((width + em * 0.4).min(w as f64 - x));
-                let needed = extent.height() * lines.len() as f64;
-                let (y, height) = if needed > height {
-                    let top = (y - (needed - height) / 2.0).max(0.0);
-                    (top, needed.min(h as f64 - top))
-                } else {
-                    (y, height)
-                };
-                ctx.rectangle(x, y, width, height);
-                ctx.clip();
+            if let Some((lines, advance, bearing, needed)) = fitted {
                 ctx.set_source_rgb(r, g, blue);
-                ctx.paint()?;
-                let foreground = if 0.2126 * r + 0.7152 * g + 0.0722 * blue > 0.55 {
-                    0.08
-                } else {
-                    0.98
-                };
-                ctx.set_source_rgb(foreground, foreground, foreground);
-                let top =
-                    y + (height - extent.height() * lines.len() as f64) / 2.0 + extent.ascent();
+                // Erase just the source label. Extra horizontal space used by
+                // the translation was already checked for neighbouring content.
+                ctx.rectangle(x - 1.0, y - 1.0, width + 2.0, height + 2.0);
+                ctx.fill()?;
+                if let Some(row) = rule {
+                    ctx.rectangle(x - 1.0, f64::from(row), width + 2.0, 1.0);
+                    ctx.fill()?;
+                }
+                let [red, green, blue] = style.color;
+                ctx.set_source_rgb(red, green, blue);
+                let top = y + ((height - needed) / 2.0).max(-1.0) - bearing;
                 for (i, line) in lines.iter().enumerate() {
-                    ctx.move_to(x + 2.0, top + i as f64 * extent.height());
+                    let used = ctx.text_extents(line)?.x_advance();
+                    let start = if centered {
+                        x + (width - used) / 2.0
+                    } else {
+                        x
+                    };
+                    ctx.move_to(start, top + i as f64 * advance);
                     ctx.show_text(line)?;
+                    if let Some(row) = rule {
+                        ctx.rectangle(start, f64::from(row), used, 1.0);
+                        ctx.fill()?;
+                    }
                 }
             }
-            ctx.restore()?;
         }
     }
     surface.flush();
@@ -578,6 +724,25 @@ mod tests {
         assert_eq!(b[0].lines, 2);
         assert!(b[0].width < 200, "a cell must not stretch across columns: {}", b[0].width);
     }
+    #[test]
+    fn navigation_bullets_separate_links_and_language_menus() {
+        let mut tsv = String::from("header\n");
+        for (x, y, width, height, label) in [
+            (10, 10, 55, 14, "English"),
+            (72, 16, 3, 3, "»"),
+            (85, 10, 48, 14, "EAEPX"),
+            (140, 16, 3, 3, "-"),
+            (152, 10, 60, 14, "Deutsch"),
+            (10, 65, 74, 14, "Features"),
+        ] {
+            tsv += &word(1, 1, y / 30, x, y, width, height, label);
+        }
+        let blocks = parse_tsv(&tsv).unwrap();
+        assert_eq!(blocks.iter().map(|b| b.source.as_str()).collect::<Vec<_>>(),
+                   ["English", "EAEPX", "Deutsch", "Features"]);
+        assert_eq!(language_menu(&blocks), [true, true, true, false]);
+    }
+
     #[test]
     fn prepare_inverts_dark_and_enlarges_small() {
         // Light text on a dark button stays readable: no local flattening wipes it out.
@@ -637,8 +802,14 @@ mod tests {
                 img.put_pixel(x, y, image::Rgb([236, 235, 229]));
             }
         }
+        for y in 20..34 {
+            for x in [25, 33, 40, 46, 51] {
+                img.put_pixel(x, y, image::Rgb([41; 3]));
+            }
+        }
         let original = DynamicImage::ImageRgb8(img);
         let mut blocks = vec![Block {
+            confidence: 95.0,
             x: 20,
             y: 20,
             width: 80,
@@ -650,6 +821,7 @@ mod tests {
         }];
         let out = render(&original, &mut blocks, 12).unwrap();
         assert!(!blocks[0].overflow);
+        assert!(out.to_rgb8() != original.to_rgb8());
         // The content area right of the sidebar keeps its own colour.
         assert_eq!(out.get_pixel(140, 27).0[..3], [246, 245, 241]);
     }
@@ -673,17 +845,60 @@ mod tests {
         assert_eq!(sources, ["Workspace", "OSWorld", "Save changes"]);
     }
     #[test]
+    fn uncertain_ocr_does_not_paint_over_the_original() {
+        let bg = image::Rgb([14, 17, 22]);
+        let blue = image::Rgb([68, 147, 248]);
+        let mut img = image::RgbImage::from_pixel(120, 50, bg);
+        for y in 10..25 {
+            for x in [13, 17, 22, 26] {
+                img.put_pixel(x, y, blue);
+            }
+        }
+        for x in 12..40 {
+            img.put_pixel(x, 27, blue);
+        }
+        let original = DynamicImage::ImageRgb8(img);
+        let mut blocks = [Block {
+            x: 12,
+            y: 10,
+            width: 28,
+            height: 15,
+            lines: 1,
+            em: 18.0,
+            source: "azer".into(),
+            translated: "азер".into(),
+            confidence: 37.0,
+            ..Default::default()
+        }];
+        let out = render(&original, &mut blocks, 12).unwrap();
+        assert!(out.to_rgb8() == original.to_rgb8());
+
+        // Once corrected by hand, the replacement uses the original blue and
+        // extends the underline to cover the new label.
+        blocks[0].corrected = true;
+        let out = render(&original, &mut blocks, 12).unwrap().to_rgb8();
+        assert!(out != original.to_rgb8());
+        assert_eq!(out.get_pixel(41, 27), &blue);
+        assert!(out.rows().skip(10).take(15).flatten().any(|p| p == &blue));
+    }
+
+    #[test]
     fn numbers_alone_are_no_text() {
         assert!(parse_tsv(&format!("header\n{}", word(1, 1, 1, 10, 10, 40, 12, "73.4%"))).is_err());
     }
     #[test]
     fn render_marks_overflow_and_keeps_original() {
-        let original = DynamicImage::new_rgb8(100, 50);
+        let mut img = image::RgbImage::new(100, 50);
+        for y in 10..20 {
+            img.put_pixel(15, y, image::Rgb([255; 3]));
+        }
+        let original = DynamicImage::ImageRgb8(img);
         let mut blocks = vec![Block {
             x: 10,
             y: 10,
             width: 10,
             height: 10,
+            confidence: 95.0,
             translated: "Очень длинный перевод".into(),
             ..Default::default()
         }];
